@@ -1,2 +1,2 @@
-# PUT-Telefonia-IP
+# PUT Telefonia IP
 Projekt PUT TIP
