@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
-import netifaces
 
 class ConnectDialog(QDialog):
     def __init__(self, parent = None):
@@ -13,15 +13,10 @@ class ConnectDialog(QDialog):
         layout = QGridLayout(self)
         #self.layout.setSpacing(10)
 
-        # My IP address
-        _lab0 = QLabel("My IP address: ")
-        self.my_ip_address = QComboBox()
-        self.my_ip_address.addItems(self.list_interfaces())
-
-        # Server IP address
-        _lab1 = QLabel("Server IP address: ")
-        self.server_ip_address = QLineEdit()
-        self.server_ip_address.setMaxLength(15)
+        
+        # IP address
+        _lab1 = QLabel("IP address: ")
+        self.ip_address = QLineEdit()
 
         # port
         _lab2 = QLabel("Port: ")
@@ -33,12 +28,10 @@ class ConnectDialog(QDialog):
         _lab3 = QLabel("Nickname: ")
         nick = QLineEdit()
 
-        layout.addWidget(_lab0,0,0)
-        layout.addWidget(self.my_ip_address,0,1)
-        layout.addWidget(_lab1,1,0)
-        layout.addWidget(self.server_ip_address,1,1)
-        layout.addWidget(_lab2,2,0)
-        layout.addWidget(port_number,2,1)
+        layout.addWidget(_lab1,0,0)
+        layout.addWidget(self.ip_address,0,1)
+        layout.addWidget(_lab2,1,0)
+        layout.addWidget(port_number,1,1)
         layout.addWidget(_lab3,3,0)
         layout.addWidget(nick,3,1)
 
@@ -52,13 +45,13 @@ class ConnectDialog(QDialog):
         cancel.clicked.connect(self.clickCancel)
 
     def clickOk(self):
-        if self.validate_ipv4(self.server_ip_address.text()):
+        if self.validateIPv4(self.ip_address.text()):
             self.accept()
 
     def clickCancel(self):
         self.reject()
 
-    def validate_ipv4(self, addr):
+    def validateIPv4(self, addr):
         addr = addr.split(".")
         if len(addr) == 4:
             try:
@@ -70,16 +63,6 @@ class ConnectDialog(QDialog):
             except:
                 return False
         return False
-
-    def list_interfaces(self):
-        ip_list = QStringList()
-        for iface in netifaces.interfaces():
-            try:
-                ip_addr = netifaces.ifaddresses(iface)[netifaces.AF_INET][0]['addr']
-                ip_list.append(ip_addr)
-            except:
-                pass
-        return ip_list
 
 
 class AddChannelDialog(QDialog):

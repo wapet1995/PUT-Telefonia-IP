@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
 
 import dialogs
 
@@ -29,11 +30,6 @@ class GUI(QMainWindow):
         disconnectAction.setShortcut('Ctrl+R')
         disconnectAction.setStatusTip('Disconnect from server')
         disconnectAction.triggered.connect(self.disconnectFromServer)
-
-        exitChannel = QAction(QIcon('ikona'), '&Exit channel', self)
-        exitChannel.setShortcut('Ctrl+E')
-        exitChannel.setStatusTip('Exit from server')
-        exitChannel.triggered.connect(self.exitFromChannel)
 
         exitAction = QAction(QIcon('ikona'), '&Close', self)        
         exitAction.setShortcut('Ctrl+Q')
@@ -77,7 +73,6 @@ class GUI(QMainWindow):
         connectionMenu = menubar.addMenu('&Connection')
         connectionMenu.addAction(connectAction)
         connectionMenu.addAction(disconnectAction)
-        connectionMenu.addAction(exitChannel)
         connectionMenu.addAction(exitAction)
 
         # administration tab
@@ -125,22 +120,14 @@ class GUI(QMainWindow):
         self.usersTree.setStyleSheet("background: #D6D6D6; font-size: 18px; border: none; color: green;")
         self.usersTree.setHeaderHidden(True)
         self.usersTree.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.usersTree.connect(self.usersTree, SIGNAL("customContextMenuRequested(QPoint)" ), self.userTreeContextMenu)
+        #self.usersTree.connect(self.usersTree, SIGNAL("customContextMenuRequested(QPoint)" ), self.userTreeContextMenu)
+        self.usersTree.customContextMenuRequested.connect(self.userTreeContextMenu)
         #self.usersTree.setEditTriggers(self.usersTree.NoEditTriggers) ???
         #self.usersTree.setDisabled(True)
 
         usersGroupLayout.addWidget(self.usersTree)
         self.usersGroupFrame.setLayout(usersGroupLayout)
         grid.addWidget(self.usersGroupFrame,1,1)
-
-
-        self.myip_ = QLabel("Local IP address:")
-        self.myip_.setMaximumHeight(30)
-        grid.addWidget(self.myip_, 3, 0)
-
-        self.servip_ = QLabel("Server IP address:")
-        self.servip_.setMaximumHeight(30)
-        grid.addWidget(self.servip_, 3, 1)
 
 
         middle.setLayout(grid)
@@ -150,12 +137,12 @@ class GUI(QMainWindow):
         # -------------   STATUSBAR  --------------------
         self.statusBar().showMessage('Not connected')
 
-        self.global_variables()
+        self.globalVariables()
         self.test()
         self.show()
 
     
-    def global_variables(self):
+    def globalVariables(self):
         self.CHANNELS_LIST = []
         self.USERS_LIST = []
 
@@ -169,21 +156,21 @@ class GUI(QMainWindow):
         self.USERS_LIST = ["Jacek","Wacek","Justyna"]
 
     # --------------------------    Auxiliary functions      -------------------------------
-    def refresh_channels_tree(self):
+    def refreshChannelsTree(self):
         self.channelsTree.clear()
         for i in self.CHANNELS_LIST:
             tmp = QTreeWidgetItem()
             tmp.setText(0, str(i))
             self.channelsTree.addTopLevelItem(tmp)
 
-    def refresh_users_tree(self):
+    def refreshUsersTree(self):
         self.usersTree.clear()
         for i in self.USERS_LIST:
             tmp = QTreeWidgetItem()
             tmp.setText(0, str(i))
             self.usersTree.addTopLevelItem(tmp)
 
-    def validate_ipv4(self, addr):
+    def validateIPv4(self, addr):
         addr = addr.split(".")
         if len(addr) == 4:
             try:
@@ -197,41 +184,33 @@ class GUI(QMainWindow):
         return False
 
 
+
+
     # --------------------------    Connection - EVENTS      -------------------------------
 
     def connectToServer(self):
         # run from Menu->Polacz
         # connect to server with given IP address, port and unique nick
-        tmp = dialogs.ConnectDialog(self)
-        if tmp.exec_():
-            self.servip_.setText("Server IP address: %s" % tmp.server_ip_address.text())
-            self.myip_.setText("Local IP address: %s" % tmp.my_ip_address.currentText())
-            print(u"Łącze z serwerem :P")
+        if dialogs.ConnectDialog(self).exec_():
+            print("Łącze z serwerem :P")
 
-            self.refresh_channels_tree()
+            self.refreshChannelsTree()
 
             self.statusBar().showMessage('Connected')
 
     def disconnectFromServer(self):
-        print(u"Rozłączam od serwera :P")
+        print("Rozłączam od serwera :P")
         self.channelsTree.clear()
         self.usersTree.clear()
-        self.servip_.setText("Server IP address:")
-        self.myip_.setText("Local IP address:")
         self.statusBar().showMessage('Disconnected')
-
-    def exitFromChannel(self):
-        self.channelsTree.clear()
-        self.usersTree.clear()
-        self.statusBar().showMessage('Exited from channel')
 
 
     def enterChannel(self, item, column):
-        print(u"--- Rozłączenie z poprzednim kanałem")  # TODO: czy wgl w jakims kanale byl
+        print("--- Rozłączenie z poprzednim kanałem")  # TODO: czy wgl w jakims kanale byl
         password, result = QInputDialog.getText(self, 'Password for channel', 'Enter password:')
         if result:
             print(password)
-            self.refresh_users_tree()
+            self.refreshUsersTree()
             
 
 
@@ -240,6 +219,7 @@ class GUI(QMainWindow):
         exit()
 
 
+    @pyqtSlot(QPoint)
     def userTreeContextMenu(self, position):
         # for context menu - right click on user in users tree
         # if usersTree has values
@@ -261,8 +241,8 @@ class GUI(QMainWindow):
         tmp = dialogs.AddChannelDialog(self)
         if tmp.exec_():
             self.CHANNELS_LIST.append(tmp.name.text())
-            print(u"Dodanie kanału ", tmp.name.text(), u" z hasłem ", tmp.password.text())
-            self.refresh_channels_tree()
+            print("Dodanie kanału ", tmp.name.text(), " z hasłem ", tmp.password.text())
+            self.refreshChannelsTree()
 
     def delChannel(self):
         channel, result = QInputDialog.getItem(self, "Delete channel", "Name", self.CHANNELS_LIST, 0, False)
@@ -270,23 +250,22 @@ class GUI(QMainWindow):
             try:
                  del self.CHANNELS_LIST[self.CHANNELS_LIST.index(channel)]
                  print("Usunięto ", channel)
-                 self.refresh_channels_tree()
+                 self.refreshChannelsTree()
             except:
-                print(u"Nie ma takiego kanału.")
+                print("Nie ma takiego kanału.")
 
     def blockNick(self):
         nick, result = QInputDialog.getText(self, 'Block nickname', 'Type nickname:')
         if result:
-            print(u"Zablokowano nick ", nick)
+            print("Zablokowano nick ", nick)
 
     def blockIPAddress(self):
-        # TODO: ograniczenie dlugosci wpisywanego tekstu
         ip_address, result = QInputDialog.getText(self, 'Block IP address', 'Type IP address:')
         if result:
-            if self.validate_ipv4(ip_address):
-                print(u"Zablokowano adres IP ", ip_address)
+            if self.validateIPv4(ip_address):
+                print("Zablokowano adres IP ", ip_address)
             else:
-                print(u"Błędny adres IPv4")
+                print("Błędny adres IPv4")
 
     #  ----------------------    HELP - EVENTS     -------------------------------
 
@@ -294,7 +273,7 @@ class GUI(QMainWindow):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle("Authors")
-        msg.setText(u"Krzysztof Łuczak <br/> Maciej Marciniak")
+        msg.setText("Krzysztof Łuczak <br/> Maciej Marciniak")
         msg.setInformativeText("")
         msg.setDetailedText("https://github.com/wapet1995/PUT-Telefonia-IP")
         msg.setStandardButtons(QMessageBox.Ok)
