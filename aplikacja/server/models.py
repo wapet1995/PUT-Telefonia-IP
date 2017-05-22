@@ -57,20 +57,20 @@ def database_connect():
     engine = create_engine('sqlite:///database.db')
     connection = engine.connect()
     
-    
+    '''
     if engine.has_table("User"):
         User.__table__.drop(engine)
         Channel.__table__.drop(engine)
         Black_IP.__table__.drop(engine)
         Black_Nick.__table__.drop(engine)
-    
+    '''
 
     # create tables
     Base.metadata.create_all(engine)
     # create session
     session_factory = sessionmaker(bind=engine)
     session = scoped_session(session_factory)
-    test_data_for_database(session)
+    #test_data_for_database(session)
     return session
 
 def test_data_for_database(session):
@@ -100,5 +100,5 @@ def test_print(session):
 
 if __name__ == "__main__": 
     con = database_connect()
-    test_data_for_database(con)
+    #test_data_for_database(con)
     #test_print(con)

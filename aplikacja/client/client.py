@@ -97,6 +97,7 @@ class GUI(QMainWindow):
         self.conn_status.setStyleSheet("font-size: 15px; border: none; color : red;")
         self.conn_status.setMaximumHeight(30)
         grid.addWidget(self.conn_status, 0, 0)
+        
         # Channels - layout and settings
         k_ = QLabel("Channels")
         k_.setMaximumHeight(30)

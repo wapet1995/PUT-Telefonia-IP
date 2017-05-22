@@ -27,9 +27,9 @@ class Server:
             self.SERVER.bind((self.SERVER_IP, self.SERVER_PORT))
             self.SERVER.listen(self.MAX_USERS)
         except Exception as e:
-            print("\nNie udało się utworzyć gniazda.", str(e))
+            print("\n-- Could not open socket", str(e))
             sys.exit(1)
-        print("\nUtworzono gniazdo...")
+        print("\n-- Socket opened")
         return self.SERVER
 
     def commands(self, comm, params_list, user_obj):
@@ -69,6 +69,7 @@ class Server:
         elif comm == "ASK_CHAN_USERS":
             """
             Ask abount users on the channel
+            ASK_CHAN_USERS channel_name
             """
             if len(params_list)<1:
                 return "ERROR channel name not give"
@@ -92,13 +93,12 @@ class Server:
             Request for delete user from server users list
             example: DISCONNECT
             """
-            tmp = self.DATABASE.query(models.User).filter_by(id=user_obj.id).first()
-            self.DATABASE.delete(tmp)
+            self.DATABASE.delete(user_obj)
             self.DATABASE.commit()
             return "DISCONNECTED"
 
         else:
-            print("Unknow command:", comm)
+            print("-- Unknow command:", comm)
             return "Unknow command: " + comm
 
     def login(self, client, ip):
@@ -110,8 +110,8 @@ class Server:
         try:
             data = client.recv(self.SIZE_OF_BUFFER)  # expected command: CONNECT name
         except Exception as e:
-            print("Timeout exceeded:", e)
-            return "Timeout exceeded", user_id.id
+            print("-- Timeout exceeded:", e)
+            return "Timeout exceeded", None
         client.settimeout(None)
         comm = data.decode('utf-8').split(" ")[0]
         params_list = data.decode('utf-8').split(" ")[1:]
@@ -142,8 +142,8 @@ class Server:
                 self.DATABASE.rollback()
                 return "ERROR database integrity error", None
         else:
-            print("Please login first")
-            return "Please login first", None
+            print("-- Please login first")
+            return "ERROR login first", None
 
 
     def management_connection(self,client):
@@ -173,24 +173,22 @@ class Server:
                     client.send(response.encode('utf-8'))  # send response to client
                     if response == "DISCONNECTED":
                         client.close()
-                        self.DATABASE.delete(user_obj)
-                        self.DATABASE.commit()
                         self.DATABASE.close()  # close database connection for this thread
-                        print("Klient", ip, "rozłączył się")
+                        print("# Klient " + ip + " rozłączył się")
                         return
                 else:
                     self.DATABASE.delete(user_obj)
                     self.DATABASE.commit()
                     client.close()
                     self.DATABASE.close()  # close database connection for this thread
-                    print("Klient", ip, "zerwał połączenie")
+                    print("# Klient " + ip + " zerwał połączenie")
                     return
             except Exception as e:
                 self.DATABASE.delete(user_obj)
                 self.DATABASE.commit()
                 client.close()
                 self.DATABASE.close()  # close database connection for this thread
-                print("\nManagement_connection error: ", str(e))
+                print("\n-- Management_connection error: ", str(e))
                 return
 
 
@@ -205,13 +203,13 @@ class Server:
                 if self.DATABASE.query(models.Black_IP).filter_by(ip=address[0]).first() is not None:
                     client.close()
                     continue
-                print("Nowe połączenie: ", address[0])
+                print("-- New connection: " + address[0])
                 t=threading.Thread(target=self.management_connection, args = (client,))
                 t.start()
             except KeyboardInterrupt:
                 self.THREADS_LOCK = False
                 self.DATABASE.close()
-                print("\nClosing server...")
+                print("\n-- Closing server")
                 return
 
 
