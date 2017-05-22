@@ -20,20 +20,20 @@ class ConnectDialog(QDialog):
 
         # port
         _lab2 = QLabel("Port: ")
-        port_number = QSpinBox()
-        port_number.setRange(1025,65535)
-        port_number.setValue(50900)
+        self.port_number = QSpinBox()
+        self.port_number.setRange(1025,65535)
+        self.port_number.setValue(50900)
 
         # nick
         _lab3 = QLabel("Nickname: ")
-        nick = QLineEdit()
+        self.nick = QLineEdit()
 
         layout.addWidget(_lab1,0,0)
         layout.addWidget(self.ip_address,0,1)
         layout.addWidget(_lab2,1,0)
-        layout.addWidget(port_number,1,1)
+        layout.addWidget(self.port_number,1,1)
         layout.addWidget(_lab3,3,0)
-        layout.addWidget(nick,3,1)
+        layout.addWidget(self.nick,3,1)
 
         # OK
         con = QPushButton("Connect")
@@ -45,7 +45,7 @@ class ConnectDialog(QDialog):
         cancel.clicked.connect(self.clickCancel)
 
     def clickOk(self):
-        if self.validateIPv4(self.ip_address.text()):
+        if self.validateIPv4(self.ip_address.text()) and not self.nick == "":
             self.accept()
 
     def clickCancel(self):
@@ -55,10 +55,10 @@ class ConnectDialog(QDialog):
         addr = addr.split(".")
         if len(addr) == 4:
             try:
-                if int(addr[0]) >= 0 and int(addr[0]) < 255 and \
-                    int(addr[1]) >= 0 and int(addr[1]) < 255 and \
-                    int(addr[2]) >= 0 and int(addr[2]) < 255 and \
-                    int(addr[3]) >= 0 and int(addr[3]) < 255:
+                if 0 <= int(addr[0]) < 255 and \
+                                        0 <= int(addr[1]) < 255 and \
+                                        0 <= int(addr[2]) < 255 and \
+                                        0 <= int(addr[3]) < 255:
                     return True
             except:
                 return False
