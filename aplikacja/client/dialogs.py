@@ -22,7 +22,7 @@ class ConnectDialog(QDialog):
         _lab2 = QLabel("Port: ")
         self.port_number = QSpinBox()
         self.port_number.setRange(1025,65535)
-        self.port_number.setValue(50900)
+        self.port_number.setValue(50000)
 
         # nick
         _lab3 = QLabel("Nickname: ")

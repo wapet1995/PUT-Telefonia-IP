@@ -122,7 +122,7 @@ class Server:
             example: CONNECT name
             """
             if len(params_list)<1:
-                return "ERROR no nick given", user_id.id
+                return "ERROR no nick given", None
 
             nick = params_list[0]
 
@@ -131,7 +131,7 @@ class Server:
                 """
                 nick is busy or blocked
                 """
-                return "NOT_CONNECTED", user_id.id
+                return "NOT_CONNECTED", None
 
             try:
                 self.DATABASE.add(models.User(nick, ip))
@@ -140,10 +140,10 @@ class Server:
                 return "CONNECTED", user_id.id
             except:
                 self.DATABASE.rollback()
-                return "ERROR database integrity error", user_id.id
+                return "ERROR database integrity error", None
         else:
             print("Please login first")
-            return "Please login first", user_id.id
+            return "Please login first", None
 
 
     def management_connection(self,client):
@@ -173,15 +173,21 @@ class Server:
                     client.send(response.encode('utf-8'))  # send response to client
                     if response == "DISCONNECTED":
                         client.close()
+                        self.DATABASE.delete(user_obj)
+                        self.DATABASE.commit()
                         self.DATABASE.close()  # close database connection for this thread
                         print("Klient", ip, "rozłączył się")
                         return
                 else:
+                    self.DATABASE.delete(user_obj)
+                    self.DATABASE.commit()
                     client.close()
                     self.DATABASE.close()  # close database connection for this thread
                     print("Klient", ip, "zerwał połączenie")
                     return
             except Exception as e:
+                self.DATABASE.delete(user_obj)
+                self.DATABASE.commit()
                 client.close()
                 self.DATABASE.close()  # close database connection for this thread
                 print("\nManagement_connection error: ", str(e))

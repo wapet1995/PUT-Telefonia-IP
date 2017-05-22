@@ -13,6 +13,7 @@ class GUI(QMainWindow):
         super(GUI, self).__init__()
 
         # self.setGeometry(300, 300, 250, 150)
+        self.CHANNELS_LIST = []
         self.setWindowTitle('TIPspeak')
         # self.resize(500, 300)
         self.setFixedSize(500, 300)
@@ -92,10 +93,14 @@ class GUI(QMainWindow):
         middle = QWidget()  # srodkowy widget
         grid = QGridLayout()  # layout srodkowego widgetu
 
+        self.conn_status = QLabel("Not connected to server")
+        self.conn_status.setStyleSheet("font-size: 15px; border: none; color : red;")
+        self.conn_status.setMaximumHeight(30)
+        grid.addWidget(self.conn_status, 0, 0)
         # Channels - layout and settings
         k_ = QLabel("Channels")
         k_.setMaximumHeight(30)
-        grid.addWidget(k_, 0, 0)
+        grid.addWidget(k_, 1, 0)
         self.channelsGroupFrame = QFrame()
         self.channelsGroupFrame.setStyleSheet(
             "background-color: #D6D6D6; border: 1px solid black; border-radius: 10px;")
@@ -108,12 +113,12 @@ class GUI(QMainWindow):
 
         channelsGroupLayout.addWidget(self.channelsTree)
         self.channelsGroupFrame.setLayout(channelsGroupLayout)
-        grid.addWidget(self.channelsGroupFrame, 1, 0)
+        grid.addWidget(self.channelsGroupFrame, 2, 0)
 
         # Users - layout and settings
         u_ = QLabel("Users")
         u_.setMaximumHeight(30)
-        grid.addWidget(u_, 0, 1)
+        grid.addWidget(u_, 1, 1)
         self.usersGroupFrame = QFrame()
         self.usersGroupFrame.setStyleSheet("background-color: #D6D6D6; border: 1px solid black; border-radius: 10px;")
 
@@ -129,7 +134,7 @@ class GUI(QMainWindow):
 
         usersGroupLayout.addWidget(self.usersTree)
         self.usersGroupFrame.setLayout(usersGroupLayout)
-        grid.addWidget(self.usersGroupFrame, 1, 1)
+        grid.addWidget(self.usersGroupFrame, 2, 1)
 
         middle.setLayout(grid)
         self.setCentralWidget(middle)
@@ -151,12 +156,27 @@ class GUI(QMainWindow):
             self.close()'''
 
     def test(self):
-        self.CHANNELS_LIST = ["Muzyka", "Informatyka", "Fotografia", "Jazda konna"]
         self.USERS_LIST = ["Jacek", "Wacek", "Justyna"]
 
     # --------------------------    Auxiliary functions      -------------------------------
     def refreshChannelsTree(self):
         self.channelsTree.clear()
+
+        data = "ASK_CHANNELS"
+        self.SOCKET.send(data.encode('utf-8'))
+
+        rev_data = self.SOCKET.recv(1024)
+        comm = rev_data.decode('utf-8').split(" ")[0]
+        params_list = rev_data.decode('utf-8').split(" ")[1]
+
+        if comm == "CHANNELS":
+            if len(params_list) > 0:
+                self.CHANNELS_LIST = params_list.split(",")
+            else:
+                self.CHANNELS_LIST = []
+        else:
+            print("Error with ASK_CHANNELS")
+
         for i in self.CHANNELS_LIST:
             tmp = QTreeWidgetItem()
             tmp.setText(0, str(i))
@@ -164,6 +184,7 @@ class GUI(QMainWindow):
 
     def refreshUsersTree(self):
         self.usersTree.clear()
+
         for i in self.USERS_LIST:
             tmp = QTreeWidgetItem()
             tmp.setText(0, str(i))
@@ -187,25 +208,49 @@ class GUI(QMainWindow):
     def connectToServer(self):
         # run from Menu->Polacz
         # connect to server with given IP address, port and unique nick
-        conn = dialogs.ConnectDialog(self)
-        if conn.exec_():
-            print("Łącze z serwerem")
-            self.SERVER_IP = str(conn.ip_address.text())
-            self.SERVER_PORT = str(conn.port_number.text())
-            self.SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.SOCKET.connect(("192.168.8.104", "5000"))
+        while True:
+            conn = dialogs.ConnectDialog(self)
+            if conn.exec_():
+                print("Łącze z serwerem")
 
-            self.refreshChannelsTree()
+                self.SERVER_IP = str(conn.ip_address.text())
+                self.SERVER_PORT = int(conn.port_number.text())
+                self.NICK = conn.nick.text()
 
-            self.statusBar().showMessage('Connected to: ' + self.SERVER_IP)
+                self.SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.SOCKET.connect((self.SERVER_IP, self.SERVER_PORT))
+
+                data = "CONNECT " + self.NICK
+                self.SOCKET.send(data.encode('utf-8'))
+
+                rev_data = self.SOCKET.recv(1024)
+                rev_data = rev_data.decode('utf-8')
+                if rev_data == 'CONNECTED':
+                    self.conn_status.setText("Connected to: " + str(self.SERVER_IP))
+                    self.conn_status.setStyleSheet("font-size: 15px; border: none; color : green;")
+
+                    self.refreshChannelsTree()
+
+                    self.statusBar().showMessage('Connected to: ' + self.SERVER_IP)
+                    break
+                else:
+                    self.statusBar().showMessage('Error with your NICK')
+            else:
+                break
 
     def disconnectFromServer(self):
         print("Rozłączam od serwera")
+
+        data = "DISCONNECT"
+        self.SOCKET.send(data.encode('utf-8'))
+
         self.channelsTree.clear()
         self.usersTree.clear()
+        self.conn_status.setText("Not connected to server")
+        self.conn_status.setStyleSheet("font-size: 15px; border: none; color : red;")
         self.statusBar().showMessage('Disconnected')
 
-    def enterChannel(self, item, column):
+    def enterChannel(self, item, column): # TODO
         print("--- Rozłączenie z poprzednim kanałem")  # TODO: czy wgl w jakims kanale byl
         password, result = QInputDialog.getText(self, 'Password for channel', 'Enter password:')
         if result:
