@@ -2,12 +2,12 @@
 
 import socket
 import sys
-
+import sha3
 
 class Client:
-    def __init__(self, my_name, my_ip_address, server_ip_address, server_port):
+    def __init__(self, nick, my_ip_address, server_ip_address, server_port):
         self.SIZE_OF_BUFFER = 1024
-        self.MY_NAME = my_name
+        self.MY_NICK = nick
         self.MY_IP_ADDRESS = my_ip_address
         self.SERVER_IP_ADDRESS = server_ip_address
         self.SERVER_PORT = server_port
@@ -19,6 +19,11 @@ class Client:
 
     # --------------------------    Auxiliary functions      -------------------------------
 
+    def hashAdminPassword(self, password):
+        s = sha3.sha3_512()
+        s.update(password)
+        return s.hexdigest().decode('utf-8')
+
     def receiveSafe(self):
         """
         For safe receiving data. Set timeouts
@@ -26,11 +31,12 @@ class Client:
         self.CONNECTION.settimeout(10.0)
         try:
             response = self.CONNECTION.recv(self.SIZE_OF_BUFFER).decode('utf-8')
+            print("\t" + response)
         except:
             # time exceeded
             return False
         self.CONNECTION.settimeout(None)
-        return response
+        return response.split(" ")
     
 
 
@@ -46,31 +52,28 @@ class Client:
             return False
 
         s.settimeout(10.0)
-        # send nick
-        s.send(b"CONNECT " + self.MY_NAME.encode('utf-8'))
+        s.send(b"CONNECT " + self.MY_NICK.encode('utf-8'))
         try:
-            response = s.recv(self.SIZE_OF_BUFFER)
+            response = s.recv(self.SIZE_OF_BUFFER).decode('utf-8')
         except:
             print("-- Connection error")
             return False
         s.settimeout(None)
 
-        if response.decode('utf-8') == "CONNECTED":
-            self.MY_NAME = self.MY_NAME
+        if response == "CONNECTED":
             self.CONNECTION = s
             return True
-        elif response.decode('utf-8') == "NOT_CONNECTED":
+        elif response == "NOT_CONNECTED":
             print("NOT_CONNECTED nick is busy or blocked")
             return False
         else:
-            print(response.decode('utf-8'))
+            print(response)
             return False
 
     def getChannelsList(self):
         self.CONNECTION.send(b"ASK_CHANNELS")
         response = self.receiveSafe()
 
-        response = response.split(" ")
         if response[0] == "CHANNELS":
             channels = response[1].split(",")
 
@@ -84,7 +87,7 @@ class Client:
         self.CONNECTION.send(b"JOIN " + channel_name.encode('utf-8') + b" " + password.encode('utf-8'))
         response = self.receiveSafe()
 
-        response = response.split(" ")
+
         if response[0] == "JOINED":
             self.CURRENT_CHANNEL = channel_name
             # tutaj bedzie polaczenie audio
@@ -97,7 +100,7 @@ class Client:
     def getChannelUsers(self, channel_name):
         self.CONNECTION.send(b"ASK_CHAN_USERS " + channel_name.encode('utf-8'))
         response = self.receiveSafe()
-        response = response.split(" ")
+
 
         if response[0] == "CHAN_USERS":
             users = response[1].split(",")
@@ -111,7 +114,7 @@ class Client:
     def exitChannel(self):
         self.CONNECTION.send(b"CHAN_EXIT")
         response = self.receiveSafe()
-        response = response.split(" ")
+
         if response[0] == "CHAN_EXITED":
             print("-- You left channel")
             self.CURRENT_CHANNEL_USERS = []
@@ -122,7 +125,7 @@ class Client:
     def disconnect(self):
         self.CONNECTION.send(b"DISCONNECT")
         response = self.receiveSafe()
-        response = response.split(" ")
+
         if response[0] == "DISCONNECTED":
             print("-- You left server")
             self.CURRENT_CHANNEL_USERS = []
@@ -133,34 +136,105 @@ class Client:
             print(' '.join(response))
 
 
+    # -----------------   ADMIN    ------------------------------------
+
+    def addChannel(self, admin_password, channel_name, channel_password):
+        self.CONNECTION.send(b"ADD_CHANNEL " + admin_password.encode('utf-8') + b" " + channel_name.encode('utf-8')
+            + b" " + channel_password.encode('utf-8'))
+
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- Channel added to list")
+        else:
+            print(' '.join(response))
+
+    def delChannel(self, admin_password, channel_name):
+        self.CONNECTION.send(b"DEL_CHANNEL " + admin_password.encode('utf-8') + b" " + channel_name.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- Channel deleted")
+        else:
+            print(' '.join(response))
+
+    def blockIP(self, admin_password, ip_address):
+        self.CONNECTION.send(b"BLOCK_IP " + admin_password.encode('utf-8') + b" " + ip_address.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- IP blocked")
+        else:
+            print(' '.join(response))
+
+    def unblockIP(self, admin_password, ip_address):
+        self.CONNECTION.send(b"UNBLOCK_IP " + admin_password.encode('utf-8') + b" " + ip_address.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- IP unblocked")
+        else:
+            print(' '.join(response))
+
+    def blockNick(self, admin_password, nick):
+        self.CONNECTION.send(b"BLOCK_NICK " + admin_password.encode('utf-8') + b" " + nick.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- Nick blocked")
+        else:
+            print(' '.join(response))
+
+    def unblockNick(self, admin_password, nick):
+        self.CONNECTION.send(b"UNBLOCK_NICK " + admin_password.encode('utf-8') + b" " + nick.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- Nick unblocked")
+        else:
+            print(' '.join(response))
+
+
+
     # --------------------    TEST methods   -------------------------
     def print_vars(self):
         for k, v in vars(self).items():
             print(str(k) + ":\t" + str(v))
-        
-    def test(self):
+
+    def help(self):
         print("""
+                    USER
                 c - connect to server
                 gcl - get channels list
-                jc [channel_name] [password] - join channel
-                gcu [channel_name] - ask about users in channel
-                ec - exit from channel
-                d - disconnect from server
-                q - exit program,
+                jc - join channel
+                gcu - get channel users
+                ec - exit channel
+                d - disconnect
+
+                    ADMIN
+                addc - add channel
+                delc - delete channel
+                bip - block ip
+                ubip - unblock ip
+                bn - block nickname
+                ubn - unblock nickname
+
+                h - help
+                q - exit program
                 v - print all class variables
             """)
+        
+    def test(self):
+        self.help()
         while True:
             try:
-                opt = input("Opcja: ")
+                opt = input("Option: ")
                 opt = opt.split(" ")
                 if opt[0] == "c":
                     self.connect()
                 elif opt[0] == "gcl":
                     self.getChannelsList()
                 elif opt[0] == "jc":
-                    self.joinChannel(opt[1], opt[2])
+                    chan = input("Channel name: ")
+                    chan_pass = input("Channel password: ")
+                    self.joinChannel(chan, chan_pass)
                 elif opt[0] == "gcu":
-                    self.getChannelUsers(opt[1])
+                    chan = input("Channel name: ")
+                    self.getChannelUsers(chan)
                 elif opt[0] == "ec":
                     self.exitChannel()
                 elif opt[0] == "d":
@@ -169,19 +243,43 @@ class Client:
                     self.print_vars()
                 elif opt[0] == "q":
                     return
+                elif opt[0] == "h":
+                    self.help()
+                elif opt[0] == "addc":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    chan = input("Channel name: ")
+                    chan_pass = input("Channel password: ")
+                    self.addChannel(admin_pass, chan, chan_pass)
+                elif opt[0] == "delc":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    chan = input("Channel name: ")
+                    self.delChannel(admin_pass, chan)
+                elif opt[0] == "bip":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    ip = input("IP address: ")
+                    self.blockIP(admin_pass, ip)
+                elif opt[0] == "ubip":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    ip = input("IP address: ")
+                    self.unblockIP(admin_pass, ip)
+                elif opt[0] == "bn":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    nick = input("Nickname: ")
+                    self.blockNick(admin_pass, nick)
+                elif opt[0] == "ubn":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    nick = input("Nickname: ")
+                    self.unblockNick(admin_pass, nick)
                 else:
-                    print("""
-                        c - connect to server
-                        gcl - get channels list
-                        jc [channel_name] [password] - join channel
-                        gcu [channel_name] - ask about users in channel
-                        ec - exit from channel
-                        d - disconnect from server
-                        q - exit program,
-                        v - print all class variables
-                    """)
-            except:
-                print("\nBad parameter")
+                    print("Choose option")
+            except Exception as e:
+                print("\nBad parameter " + str(e))
 
 
 

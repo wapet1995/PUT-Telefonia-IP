@@ -3,6 +3,8 @@ import sys
 import socket
 import threading
 import models
+import sha3
+import pyaudio
 
 
 class Server:
@@ -17,7 +19,34 @@ class Server:
 
         # logical parameters
         self.DATABASE = models.database_connect()
+        self.ADMIN_PASSWORD = None
 
+
+    # --------------------------    Auxiliary functions      -------------------------------
+
+    def setAdminPassword(self, password):
+        s = sha3.sha3_512()
+        s.update(password)
+        self.ADMIN_PASSWORD = s.hexdigest().decode('utf-8')
+
+    def checkAdminPassword(self, password):
+        if self.ADMIN_PASSWORD == password:
+            return True
+        else:
+            return False
+
+
+    # --------------------------------    AUDIO   ---------------------------------------
+    def audio_init(): # jeszcze nie robilem audio
+        FORMAT = pyaudio.paInt16
+        CHANNELS = 1
+        RATE = 10240
+        p = pyaudio.PyAudio()
+        stream = p.open(format = FORMAT, channels = CHANNELS, rate = RATE, output = True)
+        return stream
+
+
+    # ------------------------------------------------------------------------------------
     def open_socket(self):
         """
         Initialization socket
@@ -30,7 +59,6 @@ class Server:
             print("\n-- Could not open socket", str(e))
             sys.exit(1)
         print("\n-- Socket opened")
-        return self.SERVER
 
     def commands(self, comm, params_list, user_obj):
         """
@@ -95,7 +123,99 @@ class Server:
             """
             self.DATABASE.delete(user_obj)
             self.DATABASE.commit()
+            self.DATABASE.close()  # close database connection for this thread
             return "DISCONNECTED"
+
+        # -----------------------------    ADMIN    -----------------------
+
+        elif comm == "ADD_CHANNEL":
+            """
+            Request for add channel
+            """
+            if len(params_list)<3:
+                return "ERROR not enough parameters"
+            if not self.checkAdminPassword(params_list[0]):
+                return "NACK_ADMIN invalid password"
+            
+            chan = models.Channel(params_list[1], params_list[2], "")
+            self.DATABASE.add(chan)
+            self.DATABASE.commit()
+            return "ACK_ADMIN"
+
+        elif comm == "DEL_CHANNEL":
+            """
+            Request for delete channel
+            """
+            if len(params_list)<2:
+                return "ERROR not enough parameters"
+            if not self.checkAdminPassword(params_list[0]):
+                return "NACK_ADMIN invalid password"
+
+            chan = self.DATABASE.query(models.Channel).filter_by(name=params_list[1]).first()
+            if chan is not None:
+                self.DATABASE.delete(chan)
+                self.DATABASE.commit()
+                return "ACK_ADMIN"
+
+        elif comm == "BLOCK_IP":
+            """
+            Request for block IP address
+            """
+            if len(params_list)<2:
+                print(len(params_list))
+                return "ERROR not enough parameters"
+            if not self.checkAdminPassword(params_list[0]):
+                return "NACK_ADMIN invalid password"
+
+            ban = models.Black_IP(params_list[1], "")
+            self.DATABASE.add(ban)
+            self.DATABASE.commit()
+            return "ACK_ADMIN"
+
+        elif comm == "UNBLOCK_IP":
+            """
+            Request for unblock IP address
+            """
+            if len(params_list)<2:
+                print(len(params_list))
+                return "ERROR not enough parameters"
+            if not self.checkAdminPassword(params_list[0]):
+                return "NACK_ADMIN invalid password"
+
+            unban = self.DATABASE.query(models.Black_IP).filter_by(ip=params_list[1]).first()
+            if unban is not None:
+                self.DATABASE.delete(unban)
+                self.DATABASE.commit()
+            return "ACK_ADMIN"
+
+        elif comm == "BLOCK_NICK":
+            """
+            Request for block nickname
+            """
+            if len(params_list)<2:
+                return "ERROR not enough parameters"
+            if not self.checkAdminPassword(params_list[0]):
+                return "NACK_ADMIN invalid password"
+
+            ban = models.Black_Nick(params_list[1], "")
+            self.DATABASE.add(ban)
+            self.DATABASE.commit()
+            return "ACK_ADMIN"
+
+        elif comm == "UNBLOCK_NICK":
+            """
+            Request for unblock nickname
+            """
+            if len(params_list)<2:
+                return "ERROR not enough parameters"
+            if not self.checkAdminPassword(params_list[0]):
+                return "NACK_ADMIN invalid password"
+
+            unban = self.DATABASE.query(models.Black_Nick).filter_by(nick=params_list[1]).first()
+            if unban is not None:
+                self.DATABASE.delete(unban)
+                self.DATABASE.commit()
+            return "ACK_ADMIN"
 
         else:
             print("-- Unknow command:", comm)
@@ -169,24 +289,25 @@ class Server:
                 if data:
                     comm = data.decode('utf-8').split(" ")[0]
                     params_list = data.decode('utf-8').split(" ")[1:]
+
                     response = self.commands(comm, params_list, user_obj)
                     client.send(response.encode('utf-8'))  # send response to client
+
                     if response == "DISCONNECTED":
                         client.close()
-                        self.DATABASE.close()  # close database connection for this thread
                         print("# Klient " + ip + " rozłączył się")
                         return
                 else:
+                    client.close()
                     self.DATABASE.delete(user_obj)
                     self.DATABASE.commit()
-                    client.close()
                     self.DATABASE.close()  # close database connection for this thread
                     print("# Klient " + ip + " zerwał połączenie")
                     return
             except Exception as e:
+                client.close()
                 self.DATABASE.delete(user_obj)
                 self.DATABASE.commit()
-                client.close()
                 self.DATABASE.close()  # close database connection for this thread
                 print("\n-- Management_connection error: ", str(e))
                 return
@@ -196,6 +317,7 @@ class Server:
         """
         Listen to new connection and run threads for them.
         """
+        self.setAdminPassword("admin")
         self.open_socket()
         while True:
             try:
@@ -209,6 +331,7 @@ class Server:
             except KeyboardInterrupt:
                 self.THREADS_LOCK = False
                 self.DATABASE.close()
+                self.SERVER.close()
                 print("\n-- Closing server")
                 return
 
