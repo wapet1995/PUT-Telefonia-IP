@@ -15,22 +15,18 @@ class Server:
         self.SERVER_PORT = 50000
         self.SERVER_PORT_UDP = 60000
         self.MAX_USERS = 5
-        self.SERVER = None
+        self.SERVER = None  # TCP socket
+        self.SERVER_UDP = None
 
         # logical parameters
         self.DATABASE = models.database_connect()
         self.ADMIN_PASSWORD = None
         """
         self.BIG_DICT = {"channel name":
-                                        {"user1": 
-                                                {"sockets": [listen, send]},
-                                                {"queues": [receive, send]}
-                                        },
+                                        {"user1": [Queue, True]}, # True is a flag for thread
+                                        {"user2": [Queue, True]},
                         "channel2 name":
-                                        {"user2": 
-                                                {"sockets": [listen, send]},
-                                                {"queues": [receive, send]}
-                                        }
+                                        {"user3": [Queue, True]},
                         }
         """
         self.BIG_DICT = {}
@@ -60,9 +56,34 @@ class Server:
             self.SERVER.bind((self.SERVER_IP, self.SERVER_PORT))
             self.SERVER.listen(self.MAX_USERS)
         except Exception as e:
-            print("\n-- Could not open socket", str(e))
+            print("\n-- Could not open TCP socket", str(e))
             sys.exit(1)
-        print("\n-- Socket opened on " + str(self.SERVER_IP) + ":" + str(self.SERVER_PORT))
+        print("\n-- TCP socket opened on " + str(self.SERVER_IP) + ":" + str(self.SERVER_PORT))
+
+    def create_udp_socket(self):
+        try:
+            self.SERVER_UDP = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.SERVER_UDP.bind((self.SERVER_IP, self.SERVER_PORT_UDP))
+        except Exception as e:
+            print("\n-- Could not open UDP socket", str(e))
+            sys.exit(1)
+        print("\n-- UDP socket opened on " + str(self.SERVER_IP) + ":" + str(self.SERVER_PORT_UDP))
+
+    def receiving_robot(self, channel_name, my_name):
+        while self.BIG_DICT[channel_name][my_name][1]:
+            data, address = self.SERVER_UDP.recvfrom(1024)
+            for user in self.BIG_DICT[channel_name].items():
+                if user[0] == my_name:
+                    continue
+
+                queue = user[1][0]
+                queue.put(data)
+
+    def sending_robot(self, channel_name, user_obj, user_address):
+        # user_address = ('127.0.0.1', 1234)
+        queue = self.BIG_DICT[channel_name][user_obj.nick][0]
+        while self.BIG_DICT[channel_name][user_obj.nick][1]:
+            self.SERVER_UDP.sendto(queue.get(), user_address)
 
     def commands(self, comm, params_list, user_obj):
         """
@@ -94,9 +115,15 @@ class Server:
                 return "ERROR channel does not exists"
             if params_list[1] == channel.password:  # CHECK PASSWORD: TODO encryption ???
                 if user_obj.channel_id == channel.id:
-                    return "JOINED" # user was and is in channel
+                    return "ERROR you are in this channel" # user was and is in channel
                 else:
-                    self.init_audio_connection(channel.name, user_obj)
+                    # -----!!!-----
+
+                    old_channel = user_obj.channel_id.name
+                    self.BIG_DICT[channel_name].update(self.BIG_DICT[old_channel][user_obj.nick])  # moving user to another channel
+                    del self.BIG_DICT[old_channel][user_obj.nick]  # delete old registry
+
+                    # -----!!!-----
                     user_obj.channel_id = channel.id  # changing channel
                     self.DATABASE.commit()
                     return "JOINED"
@@ -303,6 +330,16 @@ class Server:
                     response = self.commands(comm, params_list, user_obj)
                     client.send(response.encode('utf-8'))  # send response to client
 
+                    if response == "JOINED":
+                        self.BIG_DICT[user_obj.channel_id.name][user_obj.nick][1] = False
+                        _, address = self.SERVER_UDP.recvfrom(1024)
+                        t_receive=threading.Thread(target=self.receiving_robot, args = (user_obj.channel_id.name, user_obj.nick))
+                        t_send=threading.Thread(target=self.sending_robot, args = (user_obj.channel_id.name,user_obj, address))
+
+                        self.BIG_DICT[user_obj.channel_id.name][user_obj.nick][1] = True
+                        t_receive.start()
+                        t_send.start()
+
                     if response == "DISCONNECTED":
                         client.close()
                         print("# Klient " + ip + " rozłączył się")
@@ -327,27 +364,17 @@ class Server:
         """
         I assume that user is not in channel_name, because this was checked before
         """
-        old_channel = user_obj.channel_id.name
-        self.BIG_DICT[channel_name].update(self.BIG_DICT[old_channel][user_obj.name])  # moving
-        del self.BIG_DICT[old_channel][user_obj.name]  # delete old registry
-
-        listen_sock, send_sock = self.BIG_DICT[channel_name][user_obj.name]['sockets']  # get sockets
-        receive_q, send_q = self.BIG_DICT[channel_name][user_obj.name]['queues']  # get queues
-
         t_proxy=threading.Thread(target=self.udp_proxy, args = (user_queue,))
         t_proxy.start()
 
         t_send=threading.Thread(target=self.management_connection, args = (user_queue,))
         t_send.start()
 
-        #udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #udp_sock.bind((self.SERVER_IP, self.SERVER_PORT_UDP))
 
     def copy_chan_2_dict(self):
         tmp_list = [i.name for i in self.DATABASE.query(models.Channel).all()]
         for i in tmp_list:
-            self.BIG_DICT[i] = {"sockets": [None, None],
-                                "queues": [Queue(), Queue()]}
+            self.BIG_DICT[i] = {"queues": [Queue(), Queue()]}
 
     def run(self):
         """
@@ -355,6 +382,7 @@ class Server:
         """
         self.setAdminPassword("admin")
         self.open_socket()
+        self.create_udp_socket()
         while True:
             try:
                 client, address = self.SERVER.accept()
