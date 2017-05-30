@@ -4,7 +4,7 @@ import socket
 import threading
 import models
 import sha3
-import pyaudio
+from queue import Queue
 
 
 class Server:
@@ -13,13 +13,28 @@ class Server:
         self.SIZE_OF_BUFFER = 1024  # max size of packets sending through socket
         self.SERVER_IP = '127.0.0.1'
         self.SERVER_PORT = 50000
+        self.SERVER_PORT_UDP = 60000
         self.MAX_USERS = 5
         self.SERVER = None
-        self.THREADS_LOCK = True
 
         # logical parameters
         self.DATABASE = models.database_connect()
         self.ADMIN_PASSWORD = None
+        """
+        self.BIG_DICT = {"channel name":
+                                        {"user1": 
+                                                {"sockets": [listen, send]},
+                                                {"queues": [receive, send]}
+                                        },
+                        "channel2 name":
+                                        {"user2": 
+                                                {"sockets": [listen, send]},
+                                                {"queues": [receive, send]}
+                                        }
+                        }
+        """
+        self.BIG_DICT = {}
+        self.copy_chan_2_dict()
 
 
     # --------------------------    Auxiliary functions      -------------------------------
@@ -35,17 +50,6 @@ class Server:
         else:
             return False
 
-
-    # --------------------------------    AUDIO   ---------------------------------------
-    def audio_init(): # jeszcze nie robilem audio
-        FORMAT = pyaudio.paInt16
-        CHANNELS = 1
-        RATE = 10240
-        p = pyaudio.PyAudio()
-        stream = p.open(format = FORMAT, channels = CHANNELS, rate = RATE, output = True)
-        return stream
-
-
     # ------------------------------------------------------------------------------------
     def open_socket(self):
         """
@@ -58,7 +62,7 @@ class Server:
         except Exception as e:
             print("\n-- Could not open socket", str(e))
             sys.exit(1)
-        print("\n-- Socket opened")
+        print("\n-- Socket opened on " + str(self.SERVER_IP) + ":" + str(self.SERVER_PORT))
 
     def commands(self, comm, params_list, user_obj):
         """
@@ -73,7 +77,8 @@ class Server:
             Ask abount channels list
             example: ASK_CHANNELS
             """
-            chan_list = ','.join([i.name for i in self.DATABASE.query(models.Channel).all()])
+            tmp_list = [i.name for i in self.DATABASE.query(models.Channel).all()]
+            chan_list = ','.join(tmp_list)
             return "CHANNELS " + chan_list
 
         elif comm == "JOIN":
@@ -88,9 +93,13 @@ class Server:
             if channel is None:
                 return "ERROR channel does not exists"
             if params_list[1] == channel.password:  # CHECK PASSWORD: TODO encryption ???
-                user_obj.channel_id = channel.id  # changing channel
-                self.DATABASE.commit()
-                return "JOINED"
+                if user_obj.channel_id == channel.id:
+                    return "JOINED" # user was and is in channel
+                else:
+                    self.init_audio_connection(channel.name, user_obj)
+                    user_obj.channel_id = channel.id  # changing channel
+                    self.DATABASE.commit()
+                    return "JOINED"
             else:
                 return "NOT_JOINED"
 
@@ -132,11 +141,12 @@ class Server:
             """
             Request for add channel
             """
-            if len(params_list)<3:
+            if len(params_list)<2:
                 return "ERROR not enough parameters"
-            if not self.checkAdminPassword(params_list[0]):
-                return "NACK_ADMIN invalid password"
             
+            if self.DATABASE.query(models.Channel).filter_by(name=params_list[1]).exists():
+                return "ERROR channel exists"
+
             chan = models.Channel(params_list[1], params_list[2], "")
             self.DATABASE.add(chan)
             self.DATABASE.commit()
@@ -146,10 +156,8 @@ class Server:
             """
             Request for delete channel
             """
-            if len(params_list)<2:
+            if len(params_list)<1:
                 return "ERROR not enough parameters"
-            if not self.checkAdminPassword(params_list[0]):
-                return "NACK_ADMIN invalid password"
 
             chan = self.DATABASE.query(models.Channel).filter_by(name=params_list[1]).first()
             if chan is not None:
@@ -161,11 +169,9 @@ class Server:
             """
             Request for block IP address
             """
-            if len(params_list)<2:
+            if len(params_list)<1:
                 print(len(params_list))
                 return "ERROR not enough parameters"
-            if not self.checkAdminPassword(params_list[0]):
-                return "NACK_ADMIN invalid password"
 
             ban = models.Black_IP(params_list[1], "")
             self.DATABASE.add(ban)
@@ -176,11 +182,9 @@ class Server:
             """
             Request for unblock IP address
             """
-            if len(params_list)<2:
+            if len(params_list)<1:
                 print(len(params_list))
                 return "ERROR not enough parameters"
-            if not self.checkAdminPassword(params_list[0]):
-                return "NACK_ADMIN invalid password"
 
             unban = self.DATABASE.query(models.Black_IP).filter_by(ip=params_list[1]).first()
             if unban is not None:
@@ -192,10 +196,8 @@ class Server:
             """
             Request for block nickname
             """
-            if len(params_list)<2:
+            if len(params_list)<1:
                 return "ERROR not enough parameters"
-            if not self.checkAdminPassword(params_list[0]):
-                return "NACK_ADMIN invalid password"
 
             ban = models.Black_Nick(params_list[1], "")
             self.DATABASE.add(ban)
@@ -206,10 +208,8 @@ class Server:
             """
             Request for unblock nickname
             """
-            if len(params_list)<2:
+            if len(params_list)<1:
                 return "ERROR not enough parameters"
-            if not self.checkAdminPassword(params_list[0]):
-                return "NACK_ADMIN invalid password"
 
             unban = self.DATABASE.query(models.Black_Nick).filter_by(nick=params_list[1]).first()
             if unban is not None:
@@ -245,6 +245,10 @@ class Server:
                 return "ERROR no nick given", None
 
             nick = params_list[0]
+            is_admin = False
+            if len(params_list) == 2 and self.checkAdminPassword(params_list[1]):
+                is_admin = True
+
 
             if self.DATABASE.query(models.User).filter_by(nick=nick).first() is not None or\
                 self.DATABASE.query(models.Black_Nick).filter_by(nick=nick).first() is not None:
@@ -254,10 +258,15 @@ class Server:
                 return "NOT_CONNECTED", None
 
             try:
-                self.DATABASE.add(models.User(nick, ip))
+                self.DATABASE.add(models.User(nick, ip, is_admin))
                 self.DATABASE.commit()
                 user_id = self.DATABASE.query(models.User).filter_by(nick=nick).first()
-                return "CONNECTED", user_id.id
+                if user_id.is_admin:
+                    print("--Admin login")
+                    return "CONNECTED-a", user_id.id
+                else:
+                    print("--Normal user login")
+                    return "CONNECTED", user_id.id
             except:
                 self.DATABASE.rollback()
                 return "ERROR database integrity error", None
@@ -277,13 +286,14 @@ class Server:
         if client_id is not None:
             client.send(message.encode('utf-8'))  # login successful
             user_obj = self.DATABASE.query(models.User).filter_by(id=client_id).first()  # get User object
+            user_queue = Queue()
         else:
             client.send(message.encode('utf-8'))  # login NOT successful
             client.close()
             self.DATABASE.close()  # close database connection for this thread
             return
 
-        while self.THREADS_LOCK:
+        while True:
             try:
                 data = client.recv(self.SIZE_OF_BUFFER)
                 if data:
@@ -313,6 +323,32 @@ class Server:
                 return
 
 
+    def init_audio_connection(self, channel_name, user_obj):
+        """
+        I assume that user is not in channel_name, because this was checked before
+        """
+        old_channel = user_obj.channel_id.name
+        self.BIG_DICT[channel_name].update(self.BIG_DICT[old_channel][user_obj.name])  # moving
+        del self.BIG_DICT[old_channel][user_obj.name]  # delete old registry
+
+        listen_sock, send_sock = self.BIG_DICT[channel_name][user_obj.name]['sockets']  # get sockets
+        receive_q, send_q = self.BIG_DICT[channel_name][user_obj.name]['queues']  # get queues
+
+        t_proxy=threading.Thread(target=self.udp_proxy, args = (user_queue,))
+        t_proxy.start()
+
+        t_send=threading.Thread(target=self.management_connection, args = (user_queue,))
+        t_send.start()
+
+        #udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        #udp_sock.bind((self.SERVER_IP, self.SERVER_PORT_UDP))
+
+    def copy_chan_2_dict(self):
+        tmp_list = [i.name for i in self.DATABASE.query(models.Channel).all()]
+        for i in tmp_list:
+            self.BIG_DICT[i] = {"sockets": [None, None],
+                                "queues": [Queue(), Queue()]}
+
     def run(self):
         """
         Listen to new connection and run threads for them.
@@ -329,7 +365,6 @@ class Server:
                 t=threading.Thread(target=self.management_connection, args = (client,))
                 t.start()
             except KeyboardInterrupt:
-                self.THREADS_LOCK = False
                 self.DATABASE.close()
                 self.SERVER.close()
                 print("\n-- Closing server")

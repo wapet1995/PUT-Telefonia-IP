@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Boolean
 from sqlalchemy.orm import sessionmaker, relationship, scoped_session
 
 
@@ -13,10 +13,12 @@ class User(Base):
     nick = Column(String(100), nullable=False)
     ip_address = Column(String(15), nullable=False)
     channel_id = Column(Integer, ForeignKey('channel.id'), nullable=True)
+    is_admin = Column(Boolean, default=False)
 
-    def __init__(self, nick, ip_address):
+    def __init__(self, nick, ip_address, is_admin):
         self.nick = nick
         self.ip_address = ip_address
+        self.is_admin = is_admin
 
 class Channel(Base):
     __tablename__ = 'channel'

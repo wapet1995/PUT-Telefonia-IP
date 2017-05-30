@@ -28,20 +28,26 @@ class ConnectDialog(QDialog):
         _lab3 = QLabel("Nickname: ")
         self.nick = QLineEdit()
 
+        # nick
+        _lab4 = QLabel("*Admin password: ")
+        self.admin_password = QLineEdit()
+
         layout.addWidget(_lab1,0,0)
         layout.addWidget(self.ip_address,0,1)
         layout.addWidget(_lab2,1,0)
         layout.addWidget(self.port_number,1,1)
         layout.addWidget(_lab3,3,0)
         layout.addWidget(self.nick,3,1)
+        layout.addWidget(_lab4,4,0)
+        layout.addWidget(self.admin_password,4,1)
 
         # OK
         con = QPushButton("Connect")
-        layout.addWidget(con, 4,1)
+        layout.addWidget(con, 5,1)
         con.clicked.connect(self.clickOk)
         # Anuluj
         cancel = QPushButton("Cancel")
-        layout.addWidget(cancel, 4,0)
+        layout.addWidget(cancel, 5,0)
         cancel.clicked.connect(self.clickCancel)
 
     def clickOk(self):

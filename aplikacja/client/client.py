@@ -1,332 +1,310 @@
 # -*- coding: utf-8 -*-
-import sys
-from PyQt5.QtGui import *
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+
 import socket
+import sys
+import sha3
 
-import dialogs
-
-
-class GUI(QMainWindow):
-    def __init__(self):
-        super(GUI, self).__init__()
-
-        # self.setGeometry(300, 300, 250, 150)
+class Client:
+    def __init__(self, nick, my_ip_address, server_ip_address, server_port):
+        self.SIZE_OF_BUFFER = 1024
+        self.MY_NICK = nick
+        self.MY_IP_ADDRESS = my_ip_address
+        self.SERVER_IP_ADDRESS = server_ip_address
+        self.SERVER_PORT = server_port
+        self.CONNECTION = None
         self.CHANNELS_LIST = []
-        self.setWindowTitle('TIPspeak')
-        # self.resize(500, 300)
-        self.setFixedSize(500, 300)
-        # self.setWindowIcon(QIcon("icons/main.png"))
-        self.SERVER_IP = None
-        self.SERVER_PORT = None
-        self.SOCKET = None
-        self.NICK = None
-        # ----------------  MENU   ---------------
+        self.CURRENT_CHANNEL = None
+        self.CURRENT_CHANNEL_USERS = []
+        self.IAM_ADMIN = False
 
-        #  connection menu objects
-
-        connectAction = QAction(QIcon('ikona'), '&Connect', self)
-        connectAction.setShortcut('Ctrl+P')
-        connectAction.setStatusTip('Connect to server')
-        connectAction.triggered.connect(self.connectToServer)
-
-        disconnectAction = QAction(QIcon('ikona'), '&Disconnect', self)
-        disconnectAction.setShortcut('Ctrl+R')
-        disconnectAction.setStatusTip('Disconnect from server')
-        disconnectAction.triggered.connect(self.disconnectFromServer)
-
-        exitAction = QAction(QIcon('ikona'), '&Close', self)
-        exitAction.setShortcut('Ctrl+Q')
-        exitAction.setStatusTip('Close application')
-        exitAction.triggered.connect(self.quit)
-
-        # administration menu objects
-
-        addChannelAction = QAction(QIcon('ikona'), '&Add channel', self)
-        # addChannelAction.setShortcut('Ctrl+A')
-        addChannelAction.setStatusTip('Add channel')
-        addChannelAction.triggered.connect(self.addChannel)
-
-        delChannelAction = QAction(QIcon('ikona'), '&Delete channel', self)
-        # delChannelAction.setShortcut('Ctrl+A')
-        delChannelAction.setStatusTip('Delete channel')
-        delChannelAction.triggered.connect(self.delChannel)
-
-        blockNickAction = QAction(QIcon('ikona'), '&Block nickname', self)
-        # blockNickAction.setShortcut('Ctrl+A')
-        blockNickAction.setStatusTip('Block nickname')
-        blockNickAction.triggered.connect(self.blockNick)
-
-        blockIPAction = QAction(QIcon('ikona'), '&Block IP', self)
-        # blockIPAction.setShortcut('Ctrl+A')
-        blockIPAction.setStatusTip('Block IP')
-        blockIPAction.triggered.connect(self.blockIPAddress)
-
-        # help
-
-        authorsAction = QAction(QIcon('ikona'), '&Authors', self)
-        # authorsAction.setShortcut('Ctrl+A')
-        authorsAction.setStatusTip('Show authors')
-        authorsAction.triggered.connect(self.credits)
-
-        menubar = self.menuBar()
-
-        # connection tab
-        connectionMenu = menubar.addMenu('&Connection')
-        connectionMenu.addAction(connectAction)
-        connectionMenu.addAction(disconnectAction)
-        connectionMenu.addAction(exitAction)
-
-        # administration tab
-        adminMenu = menubar.addMenu('&Administration')
-        adminMenu.addAction(addChannelAction)
-        adminMenu.addAction(delChannelAction)
-        adminMenu.addAction(blockNickAction)
-        adminMenu.addAction(blockIPAction)
-
-        # help tab
-        helpMenu = menubar.addMenu('&Help')
-        helpMenu.addAction(authorsAction)
-
-        # -------------   MIDDLE    ---------------------
-        middle = QWidget()  # srodkowy widget
-        grid = QGridLayout()  # layout srodkowego widgetu
-
-        self.conn_status = QLabel("Not connected to server")
-        self.conn_status.setStyleSheet("font-size: 15px; border: none; color : red;")
-        self.conn_status.setMaximumHeight(30)
-        grid.addWidget(self.conn_status, 0, 0)
-        
-        # Channels - layout and settings
-        k_ = QLabel("Channels")
-        k_.setMaximumHeight(30)
-        grid.addWidget(k_, 1, 0)
-        self.channelsGroupFrame = QFrame()
-        self.channelsGroupFrame.setStyleSheet(
-            "background-color: #D6D6D6; border: 1px solid black; border-radius: 10px;")
-
-        channelsGroupLayout = QVBoxLayout()
-        self.channelsTree = QTreeWidget()
-        self.channelsTree.setStyleSheet("background: #D6D6D6; font-size: 18px; border: none;")
-        self.channelsTree.setHeaderHidden(True)
-        self.channelsTree.itemDoubleClicked.connect(self.enterChannel)
-
-        channelsGroupLayout.addWidget(self.channelsTree)
-        self.channelsGroupFrame.setLayout(channelsGroupLayout)
-        grid.addWidget(self.channelsGroupFrame, 2, 0)
-
-        # Users - layout and settings
-        u_ = QLabel("Users")
-        u_.setMaximumHeight(30)
-        grid.addWidget(u_, 1, 1)
-        self.usersGroupFrame = QFrame()
-        self.usersGroupFrame.setStyleSheet("background-color: #D6D6D6; border: 1px solid black; border-radius: 10px;")
-
-        usersGroupLayout = QVBoxLayout()
-        self.usersTree = QTreeWidget()
-        self.usersTree.setStyleSheet("background: #D6D6D6; font-size: 18px; border: none; color: green;")
-        self.usersTree.setHeaderHidden(True)
-        self.usersTree.setContextMenuPolicy(Qt.CustomContextMenu)
-        # self.usersTree.connect(self.usersTree, SIGNAL("customContextMenuRequested(QPoint)" ), self.userTreeContextMenu)
-        self.usersTree.customContextMenuRequested.connect(self.userTreeContextMenu)
-        # self.usersTree.setEditTriggers(self.usersTree.NoEditTriggers) ???
-        # self.usersTree.setDisabled(True)
-
-        usersGroupLayout.addWidget(self.usersTree)
-        self.usersGroupFrame.setLayout(usersGroupLayout)
-        grid.addWidget(self.usersGroupFrame, 2, 1)
-
-        middle.setLayout(grid)
-        self.setCentralWidget(middle)
-
-        # -------------   STATUSBAR  --------------------
-        self.statusBar().showMessage('Not connected')
-
-        self.globalVariables()
-        self.test()
-        self.show()
-
-    def globalVariables(self):
-        self.CHANNELS_LIST = []
-        self.USERS_LIST = []
-
-    '''def keyPressEvent(self, e):
-        print("czesc")
-        if e.key() == Qt.Key_Escape:
-            self.close()'''
-
-    def test(self):
-        self.USERS_LIST = ["Jacek", "Wacek", "Justyna"]
 
     # --------------------------    Auxiliary functions      -------------------------------
-    def refreshChannelsTree(self):
-        self.channelsTree.clear()
 
-        data = "ASK_CHANNELS"
-        self.SOCKET.send(data.encode('utf-8'))
+    def hashAdminPassword(self, password):
+        s = sha3.sha3_512()
+        s.update(password)
+        return s.hexdigest().decode('utf-8')
 
-        rev_data = self.SOCKET.recv(1024)
-        comm = rev_data.decode('utf-8').split(" ")[0]
-        params_list = rev_data.decode('utf-8').split(" ")[1]
+    def receiveSafe(self):
+        """
+        For safe receiving data. Set timeouts
+        """
+        self.CONNECTION.settimeout(10.0)
+        try:
+            response = self.CONNECTION.recv(self.SIZE_OF_BUFFER).decode('utf-8')
+            print("\tKomunikat:" + response)
+        except:
+            # time exceeded
+            return False
+        self.CONNECTION.settimeout(None)
+        return response.split(" ")
+    
 
-        if comm == "CHANNELS":
-            if len(params_list) > 0:
-                self.CHANNELS_LIST = params_list.split(",")
-            else:
-                self.CHANNELS_LIST = []
+
+    # --------------------------------------------------------------------------------------
+
+
+    def connect(self, admin_password):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((self.SERVER_IP_ADDRESS, self.SERVER_PORT))
+        except Exception as e:
+            print("\n-- Could not connect to server", str(e))
+            return False
+
+        admin_password = self.hashAdminPassword(admin_password)
+        s.settimeout(10.0)
+        s.send(b"CONNECT " + self.MY_NICK.encode('utf-8') + b" " + admin_password.encode('utf-8'))
+        try:
+            response = s.recv(self.SIZE_OF_BUFFER).decode('utf-8')
+        except:
+            print("-- Connection error")
+            return False
+        s.settimeout(None)
+
+        if response == "CONNECTED":
+            self.CONNECTION = s
+            return True
+        elif response == "CONNECTED-a":
+            self.CONNECTION = s
+            self.IAM_ADMIN = True
+            return True
+
+        elif response == "NOT_CONNECTED":
+            print("NOT_CONNECTED nick is busy or blocked")
+            return False
         else:
-            print("Error with ASK_CHANNELS")
+            print(response)
+            return False
 
-        for i in self.CHANNELS_LIST:
-            tmp = QTreeWidgetItem()
-            tmp.setText(0, str(i))
-            self.channelsTree.addTopLevelItem(tmp)
+    def getChannelsList(self):
+        self.CONNECTION.send(b"ASK_CHANNELS")
+        response = self.receiveSafe()
 
-    def refreshUsersTree(self):
-        self.usersTree.clear()
+        if response[0] == "CHANNELS":
+            channels = response[1].split(",")
 
-        for i in self.USERS_LIST:
-            tmp = QTreeWidgetItem()
-            tmp.setText(0, str(i))
-            self.usersTree.addTopLevelItem(tmp)
+            self.CHANNELS_LIST = []
+            for i in channels:
+                self.CHANNELS_LIST.append(i)
+        else:
+            print(';'.join(response))
 
-    def validateIPv4(self, addr):
-        addr = addr.split(".")
-        if len(addr) == 4:
-            try:
-                if 0 <= int(addr[0]) < 255 and \
-                                        0 <= int(addr[1]) < 255 and \
-                                        0 <= int(addr[2]) < 255 and \
-                                        0 <= int(addr[3]) < 255:
-                    return True
-            except:
-                return False
-        return False
+    def joinChannel(self, channel_name, password):
+        self.CONNECTION.send(b"JOIN " + channel_name.encode('utf-8') + b" " + password.encode('utf-8'))
+        response = self.receiveSafe()
 
-    # --------------------------    Connection - EVENTS      -------------------------------
 
-    def connectToServer(self):
-        # run from Menu->Polacz
-        # connect to server with given IP address, port and unique nick
+        if response[0] == "JOINED":
+            self.CURRENT_CHANNEL = channel_name
+            # tutaj bedzie polaczenie audio
+            return True
+        elif response[0] == "NOT_JOINED":
+            print("-- Invalid password")
+            return False
+        else:
+            print(' '.join(response))
+            return False
+
+
+    def getChannelUsers(self, channel_name):
+        self.CONNECTION.send(b"ASK_CHAN_USERS " + channel_name.encode('utf-8'))
+        response = self.receiveSafe()
+
+
+        if response[0] == "CHAN_USERS":
+            users = response[1].split(",")
+
+            self.CURRENT_CHANNEL_USERS = []
+            for i in users:
+                self.CURRENT_CHANNEL_USERS.append(i)
+        else:
+            print(' '.join(response))
+
+    def exitChannel(self):
+        self.CONNECTION.send(b"CHAN_EXIT")
+        response = self.receiveSafe()
+
+        if response[0] == "CHAN_EXITED":
+            print("-- You left channel")
+            self.CURRENT_CHANNEL_USERS = []
+            self.CURRENT_CHANNEL = None
+            return True
+        else:
+            print(' '.join(response))
+            return False
+
+    def disconnect(self):
+        self.CONNECTION.send(b"DISCONNECT")
+        response = self.receiveSafe()
+
+        if response[0] == "DISCONNECTED":
+            print("-- You left server")
+            self.CURRENT_CHANNEL_USERS = []
+            self.CURRENT_CHANNEL = None
+            self.CHANNELS_LIST = []
+            self.CONNECTION.close()
+            return True
+        else:
+            print(' '.join(response))
+            return False
+
+
+    # -----------------   ADMIN    ------------------------------------
+
+    def addChannel(self, channel_name, channel_password):
+        self.CONNECTION.send(b"ADD_CHANNEL " + b" " + channel_name.encode('utf-8')
+            + b" " + channel_password.encode('utf-8'))
+
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- Channel added to list")
+        else:
+            print(' '.join(response))
+
+    def delChannel(self, channel_name):
+        self.CONNECTION.send(b"DEL_CHANNEL " + b" " + channel_name.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- Channel deleted")
+        else:
+            print(' '.join(response))
+
+    def blockIP(self, ip_address):
+        self.CONNECTION.send(b"BLOCK_IP " + b" " + ip_address.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- IP blocked")
+            return True
+        else:
+            print(' '.join(response))
+            return False
+
+    def unblockIP(self, ip_address):
+        self.CONNECTION.send(b"UNBLOCK_IP " + b" " + ip_address.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- IP unblocked")
+            return True
+        else:
+            print(' '.join(response))
+            return False
+
+    def blockNick(self, nick):
+        self.CONNECTION.send(b"BLOCK_NICK " + b" " + nick.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- Nick blocked")
+            return True
+        else:
+            print(' '.join(response))
+            return False
+
+    def unblockNick(self, nick):
+        self.CONNECTION.send(b"UNBLOCK_NICK " + b" " + nick.encode('utf-8'))
+        response = self.receiveSafe()
+        if response[0] == "ACK_ADMIN":
+            print("-- Nick unblocked")
+            return True
+        else:
+            print(' '.join(response))
+            return False
+
+
+
+    # --------------------    TEST methods   -------------------------
+    def print_vars(self):
+        for k, v in vars(self).items():
+            print(str(k) + ":\t" + str(v))
+
+    def help(self):
+        print("""
+                    USER
+                c - connect to server
+                gcl - get channels list
+                jc - join channel
+                gcu - get channel users
+                ec - exit channel
+                d - disconnect
+
+                    ADMIN
+                addc - add channel
+                delc - delete channel
+                bip - block ip
+                ubip - unblock ip
+                bn - block nickname
+                ubn - unblock nickname
+
+                h - help
+                q - exit program
+                v - print all class variables
+            """)
+        
+    def test(self):
+        self.help()
         while True:
-            conn = dialogs.ConnectDialog(self)
-            if conn.exec_():
-                print("Łącze z serwerem")
-
-                self.SERVER_IP = str(conn.ip_address.text())
-                self.SERVER_PORT = int(conn.port_number.text())
-                self.NICK = conn.nick.text()
-
-                self.SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.SOCKET.connect((self.SERVER_IP, self.SERVER_PORT))
-
-                data = "CONNECT " + self.NICK
-                self.SOCKET.send(data.encode('utf-8'))
-
-                rev_data = self.SOCKET.recv(1024)
-                rev_data = rev_data.decode('utf-8')
-                if rev_data == 'CONNECTED':
-                    self.conn_status.setText("Connected to: " + str(self.SERVER_IP))
-                    self.conn_status.setStyleSheet("font-size: 15px; border: none; color : green;")
-
-                    self.refreshChannelsTree()
-
-                    self.statusBar().showMessage('Connected to: ' + self.SERVER_IP)
-                    break
-                else:
-                    self.statusBar().showMessage('Error with your NICK')
-            else:
-                break
-
-    def disconnectFromServer(self):
-        print("Rozłączam od serwera")
-
-        data = "DISCONNECT"
-        self.SOCKET.send(data.encode('utf-8'))
-
-        self.channelsTree.clear()
-        self.usersTree.clear()
-        self.conn_status.setText("Not connected to server")
-        self.conn_status.setStyleSheet("font-size: 15px; border: none; color : red;")
-        self.statusBar().showMessage('Disconnected')
-
-    def enterChannel(self, item, column): # TODO
-        print("--- Rozłączenie z poprzednim kanałem")  # TODO: czy wgl w jakims kanale byl
-        password, result = QInputDialog.getText(self, 'Password for channel', 'Enter password:')
-        if result:
-            print(password)
-            self.refreshUsersTree()
-
-    def quit(self):
-        self.disconnectFromServer()  # TODO: jakas zmienna sprawdzajaca czy poprawnie rozlaczono z serwerem
-        exit()
-
-    @pyqtSlot(QPoint)
-    def userTreeContextMenu(self, position):
-        # for context menu - right click on user in users tree
-        # if usersTree has values
-        if self.usersTree.topLevelItemCount() > 0:
-            self.listMenu = QMenu()
-            menu_item = self.listMenu.addAction("print nick")
-            menu_item.triggered.connect(self.userTreeMenu)
-            parent_position = self.usersTree.mapToGlobal(QPoint(0, 0))
-            self.listMenu.move(parent_position + position)
-            self.listMenu.show()
-
-    def userTreeMenu(self):
-        print(self.usersTree.currentItem().text(0))  # ??? jeszcze nie wiem czemu dziala z zerem
-
-    # ---------------------------     Administration - EVENTS     -------------------------------
-
-    def addChannel(self):
-        tmp = dialogs.AddChannelDialog(self)
-        if tmp.exec_():
-            self.CHANNELS_LIST.append(tmp.name.text())
-            print("Dodanie kanału ", tmp.name.text(), " z hasłem ", tmp.password.text())
-            self.refreshChannelsTree()
-
-    def delChannel(self):
-        channel, result = QInputDialog.getItem(self, "Delete channel", "Name", self.CHANNELS_LIST, 0, False)
-        if result:
             try:
-                del self.CHANNELS_LIST[self.CHANNELS_LIST.index(channel)]
-                print("Usunięto ", channel)
-                self.refreshChannelsTree()
-            except:
-                print("Nie ma takiego kanału.")
+                opt = input("Option: ")
+                opt = opt.split(" ")
+                if opt[0] == "c":
+                    self.connect()
+                elif opt[0] == "gcl":
+                    self.getChannelsList()
+                elif opt[0] == "jc":
+                    chan = input("Channel name: ")
+                    chan_pass = input("Channel password: ")
+                    self.joinChannel(chan, chan_pass)
+                elif opt[0] == "gcu":
+                    chan = input("Channel name: ")
+                    self.getChannelUsers(chan)
+                elif opt[0] == "ec":
+                    self.exitChannel()
+                elif opt[0] == "d":
+                    self.disconnect()
+                elif opt[0] == "v":
+                    self.print_vars()
+                elif opt[0] == "q":
+                    return
+                elif opt[0] == "h":
+                    self.help()
+                elif opt[0] == "addc":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    chan = input("Channel name: ")
+                    chan_pass = input("Channel password: ")
+                    self.addChannel(admin_pass, chan, chan_pass)
+                elif opt[0] == "delc":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    chan = input("Channel name: ")
+                    self.delChannel(admin_pass, chan)
+                elif opt[0] == "bip":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    ip = input("IP address: ")
+                    self.blockIP(admin_pass, ip)
+                elif opt[0] == "ubip":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    ip = input("IP address: ")
+                    self.unblockIP(admin_pass, ip)
+                elif opt[0] == "bn":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    nick = input("Nickname: ")
+                    self.blockNick(admin_pass, nick)
+                elif opt[0] == "ubn":
+                    admin_pass = input("Admin password: ")
+                    admin_pass = self.hashAdminPassword(admin_pass)
+                    nick = input("Nickname: ")
+                    self.unblockNick(admin_pass, nick)
+                else:
+                    print("Choose option")
+            except Exception as e:
+                print("\nBad parameter " + str(e))
 
-    def blockNick(self):
-        nick, result = QInputDialog.getText(self, 'Block nickname', 'Type nickname:')
-        if result:
-            print("Zablokowano nick ", nick)
-
-    def blockIPAddress(self):
-        ip_address, result = QInputDialog.getText(self, 'Block IP address', 'Type IP address:')
-        if result:
-            if self.validateIPv4(ip_address):
-                print("Zablokowano adres IP ", ip_address)
-            else:
-                print("Błędny adres IPv4")
-
-    # ----------------------    HELP - EVENTS     -------------------------------
-
-    def credits(self):
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Information)
-        msg.setWindowTitle("Authors")
-        msg.setText("Krzysztof Łuczak <br/> Maciej Marciniak")
-        msg.setInformativeText("")
-        msg.setDetailedText("https://github.com/wapet1995/PUT-Telefonia-IP")
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
 
 
-def main():
-    app = QApplication(sys.argv)
-    ex = GUI()
-    sys.exit(app.exec_())
-
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__": 
+    k = Client("krzysiek", "127.0.0.1", "127.0.0.1", 50000) 
+    k.test()
