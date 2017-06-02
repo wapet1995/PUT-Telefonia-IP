@@ -73,10 +73,12 @@ class Client:
 
         if response == "CONNECTED":
             self.CONNECTION = s
+            self.udp_connection()
             return True
         elif response == "CONNECTED-a":
             self.CONNECTION = s
             self.IAM_ADMIN = True
+            self.udp_connection()
             return True
 
         elif response == "NOT_CONNECTED":
@@ -131,15 +133,21 @@ class Client:
     # ------------------------   UDP AUDIO   --------------------------------------
     def record_and_send(self): # record and send voice
         while self.AUDIO_LOCK:
-            data = self.AUDIO.record()
-            self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, self.UDP_PORT))
+            try:
+                data = self.AUDIO.record()
+                self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, self.UDP_PORT))
+            except:
+                pass
         if self.AUDIO is not None:  # close audio stream
             self.AUDIO.exit()
 
     def receive_and_play(self):
         while self.AUDIO_LOCK:
-            data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
-            self.AUDIO.play(data)
+            try:
+                data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
+                self.AUDIO.play(data)
+            except:
+                pass
         if self.AUDIO is not None:  # close audio stream
             self.AUDIO.exit()
 
@@ -185,6 +193,8 @@ class Client:
             self.CURRENT_CHANNEL = None
             self.CHANNELS_LIST = []
             self.CONNECTION.close()
+            if self.UDP_CONNECTION is not None:
+                self.UDP_CONNECTION.close()
             return True
         else:
             print(' '.join(response))
