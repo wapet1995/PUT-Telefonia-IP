@@ -139,12 +139,12 @@ class Client:
         while self.AUDIO_LOCK:
             try:
                 #data = self.AUDIO.record()
-                data = "Stacjonarka"
+                data = b"Stacjonarka"
                 self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, self.UDP_PORT))
                 print("Wysłane:", data)
                 time.sleep(2)
-            except:
-                pass
+            except Exception as e:
+                print("UDP sending error:", e)
         if self.AUDIO is not None:  # close audio stream
             self.AUDIO.exit()
 
@@ -156,7 +156,7 @@ class Client:
                 data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
                 self.UDP_CONNECTION.settimeout(None)
                 #self.AUDIO.play(data)
-                print(data.encode('utf-8'))
+                print(data.decode('utf-8'))
                 time.sleep(2)
             except socket.timeout:
                 print("NIC NIE DOSTAŁEM :(")

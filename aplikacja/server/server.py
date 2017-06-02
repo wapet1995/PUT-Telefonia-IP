@@ -18,6 +18,7 @@ class Server:
         self.MAX_USERS = 5
         self.SERVER = None  # TCP socket
         self.SERVER_UDP = None
+        self.GLOBAL_THREAD_LOCK = True
 
         # logical parameters
         self.DATABASE = models.database_connect()
@@ -92,24 +93,26 @@ class Server:
 
     def receiving_robot(self, nick):
         user = self.DATABASE.query(models.User).filter_by(nick=nick).first()
-        while True:
+        while self.GLOBAL_THREAD_LOCK:
             channel = self.DATABASE.query(models.Channel).filter_by(id=user.channel_id).first()
+            if channel is None:
+                continue
             try:
                 self.SERVER_UDP.settimeout(2)
                 data, address = self.SERVER_UDP.recvfrom(1024)
-                print("UDP mam:", data.encode('utf-8'))
+                print("UDP mam:", data.decode('utf-8'))
                 self.SERVER_UDP.settimeout(None)
             except socket.timeout:
                 print("timeoucik")
                 continue
-            except:
-                print("Receiving robot konczy")
+            except Exception as e:
+                print("Receiving robot konczy", e)
                 return
             packet = [nick, data]
             self.BIG_LIST[channel.name].put(packet)
 
     def sending_robot(self, channel):
-        while True:
+        while self.GLOBAL_THREAD_LOCK:
             nick, data = self.BIG_LIST[channel].get()
             clients = self.get_channel_users(channel)
             print("klienci:", clients)
@@ -407,6 +410,7 @@ class Server:
                 t=threading.Thread(target=self.management_connection, args = (client,))
                 t.start()
             except KeyboardInterrupt:
+                self.GLOBAL_THREAD_LOCK = False
                 self.DATABASE.close()
                 self.SERVER_UDP.close()
                 self.SERVER.close()
