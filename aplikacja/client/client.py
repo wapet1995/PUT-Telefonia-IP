@@ -148,10 +148,14 @@ class Client:
     def receive_and_play(self):
         while self.AUDIO_LOCK:
             try:
+                self.UDP_CONNECTION.settimeout(1)
                 data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
                 #self.AUDIO.play(data)
                 print(data)
                 time.sleep(2)
+                self.UDP_CONNECTION.settimeout(None)
+            except socket.Timeouterror:
+                pass
             except:
                 pass
         if self.AUDIO is not None:  # close audio stream
@@ -164,8 +168,6 @@ class Client:
         self.CONNECTION.send(b"ASK_CHAN_USERS " + channel_name.encode('utf-8'))
         response = self.receiveSafe()
 
-        print(type(response))
-        print(response)
         if response[0] == "CHAN_USERS":
             users = response[1].split(",")
 

@@ -24,15 +24,20 @@ class Server:
         self.DATABASE = models.database_connect()
         self.ADMIN_PASSWORD = None
         """
-        self.BIG_DICT = {"channel name":
-                                        {"user1": [Queue, True]}, # True is a flag for thread
-                                        {"user2": [Queue, True]},
-                        "channel2 name":
-                                        {"user3": [Queue, True]},
-                        }
+        self.CHANS_ID_DICT = {
+                                "kanal1": 1,
+                                "kanal2": 0
+                            }
+        self.BIG_LIST = [
+                            [ ["user1", Queue(), FLAG], ["user2", Queue(), FLAG], ["user3", Queue(), FLAG] ],
+                            [ ["user4", Queue(), FLAG], ["user5", Queue(), FLAG], ["user6", Queue(), FLAG] ],
+                        ]
         """
-        self.BIG_DICT = {}
-        self.copy_chan_2_dict()
+
+        self.CHANS_ID_DICT = {}
+        self.iter = 0
+        self.BIG_LIST = []
+        self.set_CHAN_ID_DICT()
 
 
     # --------------------------    Auxiliary functions      -------------------------------
@@ -47,6 +52,72 @@ class Server:
             return True
         else:
             return False
+
+    # ------------- BIG LIST --------------------------
+
+    def set_CHAN_ID_DICT(self):
+        chans = self.DATABASE.query(models.Channel).all()
+        for chan in chans:
+            if chan not in self.CHANS_ID_DICT:
+                self.CHANS_ID_DICT[chan.name] = self.iter
+                self.BIG_LIST.append([])
+                self.iter += 1
+
+    def get_usernames_of_channel(self, channel):
+        chan_id = self.CHANS_ID_DICT[channel]
+        usr_list = []
+        for i in self.BIG_LIST[chan_id]:
+            usr_list.append(i[0])
+
+    def get_queues_of_channel(self, channel, my_name):
+        chan_id = self.CHANS_ID_DICT[channel]
+        q_list = []
+        for i in self.BIG_LIST[chan_id]:
+            if i[0] != my_name:
+                q_list.append(i[1])
+
+    def get_flag_of_user(self, channel, username):
+        chan_id = self.CHANS_ID_DICT[channel]
+        for i in self.BIG_LIST[chan_id]:
+            if i[0] == username:
+                return i[2]
+
+    def get_queue_of_user(self, channel, username):
+        chan_id = self.CHANS_ID_DICT[channel]
+        for i in self.BIG_LIST[chan_id]:
+            if i[0] == username:
+                return i[1]
+
+    def move_user(self, old_channel, new_channel, username):
+        old_chan_id = self.CHANS_ID_DICT[old_channel]
+        new_chan_id = self.CHANS_ID_DICT[new_channel]
+        for i in self.BIG_LIST[old_chan_id]:
+            if i[0] == username:
+                self.BIG_LIST[new_chan_id].append(i)
+                self.BIG_LIST[old_chan_id].remove(i)
+
+    def add_user_2_chan(self, channel, username):
+        chan_id = self.CHANS_ID_DICT[channel]
+        tmp = [username, Queue(), False]
+        self.BIG_LIST[chan_id].append(tmp)
+
+    def set_user_flag(self, channel, username, flag):
+        chan_id = self.CHANS_ID_DICT[channel]
+        for i in self.BIG_LIST[chan_id]:
+            if i[0] == username:
+                i[2] = flag
+
+    # -----------------------------------------
+
+
+    def get_users_list_from_biglist(self, channel, username):
+        q_list = []
+        for i, chans in enumerate(self.BIG_LIST):
+            if channel in chans:
+                for j, usr in enumerate(self.BIG_LIST[i][channel]):
+                    if username == usr:
+                        q_list.append(self.BIG_LIST[i][channel][j][username][0])
+
 
     # ------------------------------------------------------------------------------------
     def open_socket(self):
@@ -71,29 +142,35 @@ class Server:
             sys.exit(1)
         print("\n-- UDP socket opened on " + str(self.SERVER_IP) + ":" + str(self.SERVER_PORT_UDP))
 
+    # ----------------------   UDP connection   --------------------------
     def receiving_robot(self, channel_name, my_name):
-        while self.UDP_LOCK and self.BIG_DICT[channel_name][my_name][1]:
+        flag = self.get_flag_of_user(channel_name, my_name)
+        while self.UDP_LOCK and flag:
             try:
+                self.SERVER_UDP.settimeout(1)
                 data, address = self.SERVER_UDP.recvfrom(1024)
+                self.SERVER_UDP.settimeout(None)
+            except socket.Timeouterror:
+                pass
             except:
                 print("Receiving robot konczy")
                 return
-            for user in self.BIG_DICT[channel_name].items():
-                if user[0] == my_name:
-                    continue
-
-                queue = user[1][0]
-                queue.put(data)
+            channel_queues = get_queues_of_channel(channel_name, my_name)
+            for q in channel_queues:
+                q.put(data)
 
     def sending_robot(self, channel_name, user_obj, user_address):
-        # user_address = ('127.0.0.1', 1234)
-        queue = self.BIG_DICT[channel_name][user_obj.nick][0]
-        while self.UDP_LOCK and self.BIG_DICT[channel_name][user_obj.nick][1]:
+        # user_address = ('127.0.0.1', 1234) -> example
+        queue = self.get_queue_of_user(channel_name, user_obj.nick)
+        flag = self.get_flag_of_user(channel_name, user_obj.nick)
+        while self.UDP_LOCK and flag:
             try:
                 self.SERVER_UDP.sendto(queue.get(), user_address)
             except:
                 print("Sending robot konczy")
                 return
+
+    #  ----------------------------------------------------------------------
 
     def commands(self, comm, params_list, user_obj):
         """
@@ -130,11 +207,10 @@ class Server:
                     # -----!!!-----
                     if user_obj.channel_id is not None:
                         old_channel = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
-                        self.BIG_DICT[channel.name].update(self.BIG_DICT[old_channel.name][user_obj.nick])  # moving user to another channel
-                        del self.BIG_DICT[old_channel.name][user_obj.nick]  # delete old registry
+                        self.move_user(old_channel.name, channel.name, user_obj.nick)  # moving user to another channel
                     else:
                         # add new user to channel (dictionary)
-                        self.BIG_DICT[channel.name] = {user_obj.nick: [Queue(), False]}
+                        self.add_user_2_chan(channel.name, user_obj.nick)
 
                     # -----!!!-----
                     user_obj.channel_id = channel.id  # changing channel
@@ -190,6 +266,7 @@ class Server:
             chan = models.Channel(params_list[1], params_list[2], "")
             self.DATABASE.add(chan)
             self.DATABASE.commit()
+            self.set_CHAN_ID_DICT()
             return "ACK_ADMIN"
 
         elif comm == "DEL_CHANNEL":
@@ -346,13 +423,13 @@ class Server:
                     
                     if response == "JOINED":
                         channel = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
-                        self.BIG_DICT[channel.name][user_obj.nick][1] = False
+                        self.set_user_flag(channel.name, user_obj.nick, False)
                         _, address = self.SERVER_UDP.recvfrom(1024)
                         self.UDP_LOCK = True
-                        t_receive = threading.Thread(target=self.receiving_robot, args = (channel.name, user_obj.nick))
-                        t_send = threading.Thread(target=self.sending_robot, args = (channel.name,user_obj, address))
+                        t_receive = threading.Thread(target=self.receiving_robot, args=(channel.name, user_obj.nick))
+                        t_send = threading.Thread(target=self.sending_robot, args=(channel.name,user_obj, address))
 
-                        self.BIG_DICT[channel.name][user_obj.nick][1] = True
+                        self.set_user_flag(channel.name, user_obj.nick, True)
                         t_receive.start()
                         t_send.start()
                     
@@ -382,11 +459,6 @@ class Server:
                 return
 
 
-    def copy_chan_2_dict(self):
-        tmp_list = [i.name for i in self.DATABASE.query(models.Channel).all()]
-        for i in tmp_list:
-            self.BIG_DICT[str(i)] = None  # channel has 0 users
-
     def run(self):
         """
         Listen to new connection and run threads for them.
@@ -405,6 +477,7 @@ class Server:
                 t.start()
             except KeyboardInterrupt:
                 self.DATABASE.close()
+                self.SERVER_UDP.close()
                 self.SERVER.close()
                 print("\n-- Closing server")
                 return

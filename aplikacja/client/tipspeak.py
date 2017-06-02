@@ -309,9 +309,9 @@ class GUI(QMainWindow):
 
     def quit(self):
         if self.CONNECTION is None:
-            exit()
+            sys.exit(0)
         elif self.disconnectFromServer():
-            exit()
+            sys.exit(0)
         else:
             print("Spróbuj wyjść jeszcze raz")
 
