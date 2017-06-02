@@ -58,7 +58,7 @@ class Black_Nick(Base):
 
 
 def database_connect():
-    engine = create_engine('sqlite:///database.db')
+    engine = create_engine('sqlite:///database.db?check_same_thread=False')
     connection = engine.connect()
     
     '''

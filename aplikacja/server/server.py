@@ -30,6 +30,7 @@ class Server:
                         }
         """
         self.BIG_LIST = {}
+        self.USERS_IN_CHANNELS = {}
 
 
     # --------------------------    Auxiliary functions      -------------------------------
@@ -60,7 +61,7 @@ class Server:
         # except me
         channel = self.DATABASE.query(models.Channel).filter_by(name=channel_name).first()
         addr_list = []
-        for i in channel.user:
+        for i in channel.users:
             tmp = [i.nick, i.ip_address, i.udp_port]
             addr_list.append(tmp)
         return addr_list
@@ -92,10 +93,10 @@ class Server:
     # ----------------------   UDP connection   --------------------------
 
     def receiving_robot(self, nick):
-        user = self.DATABASE.query(models.User).filter_by(nick=nick).first()
         while self.GLOBAL_THREAD_LOCK:
-            channel = self.DATABASE.query(models.Channel).filter_by(id=user.channel_id).first()
-            if channel is None:
+            try:
+                channel = self.USERS_IN_CHANNELS[nick]
+            except:
                 continue
             try:
                 self.SERVER_UDP.settimeout(2)
@@ -109,13 +110,18 @@ class Server:
                 print("Receiving robot konczy", e)
                 return
             packet = [nick, data]
-            self.BIG_LIST[channel.name].put(packet)
+            self.BIG_LIST[channel].put(packet)
 
     def sending_robot(self, channel):
+        print("sending robot zaczyna")
         while self.GLOBAL_THREAD_LOCK:
-            nick, data = self.BIG_LIST[channel].get()
+            try:
+                nick, data = self.BIG_LIST[channel].get(timeout=4)
+            except:
+                print("timeout sending robota")
+                continue
             clients = self.get_channel_users(channel)
-            print("klienci:", clients)
+            print(clients)
             for cli in clients:
                 if cli[0] != nick:
                     try:
@@ -124,6 +130,8 @@ class Server:
                     except:
                         print("Sending robot konczy")
                         return
+                else:
+                    print("Do siebie nie wysylam")
 
     #  ----------------------------------------------------------------------
 
@@ -160,6 +168,7 @@ class Server:
                     return "ERROR you are in this channel" # user was and is in channel
                 else:
                     user_obj.channel_id = channel.id  # changing channel
+                    self.USERS_IN_CHANNELS[user_obj.nick] = channel.name
                     self.DATABASE.commit()
                     return "JOINED"
             else:
