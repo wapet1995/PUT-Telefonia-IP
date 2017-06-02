@@ -3,9 +3,11 @@
 import socket
 import sys
 import sha3
+import threading
+from audio import Audio
 
 class Client:
-    def __init__(self, nick, my_ip_address, server_ip_address, server_port):
+    def __init__(self, nick, my_ip_address, server_ip_address, server_port, udp_port):
         self.SIZE_OF_BUFFER = 1024
         self.MY_NICK = nick
         self.MY_IP_ADDRESS = my_ip_address
@@ -16,6 +18,12 @@ class Client:
         self.CURRENT_CHANNEL = None
         self.CURRENT_CHANNEL_USERS = []
         self.IAM_ADMIN = False
+
+        # audio UDP
+        self.UDP_CONNECTION = None
+        self.UDP_PORT = udp_port
+        self.AUDIO_LOCK = False
+        self.AUDIO = None
 
 
     # --------------------------    Auxiliary functions      -------------------------------
@@ -77,6 +85,9 @@ class Client:
             print(response)
             return False
 
+    def udp_connection(self):
+        self.UDP_CONNECTION = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
     def getChannelsList(self):
         self.CONNECTION.send(b"ASK_CHANNELS")
         response = self.receiveSafe()
@@ -91,13 +102,21 @@ class Client:
             print(';'.join(response))
 
     def joinChannel(self, channel_name, password):
+        self.AUDIO_LOCK = False  # stop previous audio stream
         self.CONNECTION.send(b"JOIN " + channel_name.encode('utf-8') + b" " + password.encode('utf-8'))
         response = self.receiveSafe()
 
 
         if response[0] == "JOINED":
             self.CURRENT_CHANNEL = channel_name
-            # tutaj bedzie polaczenie audio
+            # !!!
+            self.AUDIO = Audio()
+            self.AUDIO_LOCK = True
+            t_record = threading.Thread(target=self.record_and_send, args = ())
+            t_player = threading.Thread(target=self.receive_and_play, args = ())
+            t_record.start()
+            t_player.start()
+            # !!!
             return True
         elif response[0] == "NOT_JOINED":
             print("-- Invalid password")
@@ -105,6 +124,23 @@ class Client:
         else:
             print(' '.join(response))
             return False
+
+    # ------------------------   UDP AUDIO   --------------------------------------
+    def record_and_send(self): # record and send voice
+        while self.AUDIO_LOCK:
+            data = self.AUDIO.record()
+            self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, self.UDP_PORT))
+        if self.AUDIO is not None:  # close audio stream
+            self.AUDIO.exit()
+
+    def receive_and_play(self):
+        while self.AUDIO_LOCK:
+            data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
+            self.AUDIO.play(data)
+        if self.AUDIO is not None:  # close audio stream
+            self.AUDIO.exit()
+
+    # -----------------------------------------------------------------------------
 
 
     def getChannelUsers(self, channel_name):
@@ -122,6 +158,7 @@ class Client:
             print(' '.join(response))
 
     def exitChannel(self):
+        self.AUDIO_LOCK = False  # stop audio stream
         self.CONNECTION.send(b"CHAN_EXIT")
         response = self.receiveSafe()
 
@@ -135,6 +172,7 @@ class Client:
             return False
 
     def disconnect(self):
+        self.AUDIO_LOCK = False  # stop audio stream
         self.CONNECTION.send(b"DISCONNECT")
         response = self.receiveSafe()
 

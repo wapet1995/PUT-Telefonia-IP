@@ -198,7 +198,7 @@ class GUI(QMainWindow):
             server_port = conn.port_number.value()
             nick = str(conn.nick.text())
             admin_password = str(conn.admin_password.text())
-            self.CONNECTION = Client(nick, "127.0.0.1", server_ip, server_port)
+            self.CONNECTION = Client(nick, "127.0.0.1", server_ip, server_port) # TODO
             if self.CONNECTION.connect(admin_password): # return True
                 print("Połączono")
                 self.statusBar().showMessage('Connected')
@@ -245,17 +245,23 @@ class GUI(QMainWindow):
                     print("Wszedłeś do kanału")
                     self.chosen_channel.setText("Channel: " + self.CONNECTION.CURRENT_CHANNEL)
             else:
-                print("Błąd podczas wychodzenia z kanału.")
+                print("Błąd podczas wchodzenia do kanału. (1)")
+                self.timer_channels.start()
+                return
         else:
             password, result = QInputDialog.getText(self, 'Password for channel', 'Enter password:')
             if result and self.CONNECTION.joinChannel(item.text(column), password):
                 print("Wszedłeś do kanału")
                 self.chosen_channel.setText("Channel: " + self.CONNECTION.CURRENT_CHANNEL)
+            else:
+                print("Błąd podczas wchodzenia do kanału. (2)")
+                self.timer_channels.start()
+                return
         
         self.exitFromChannelAction.setEnabled(True)
-        self.refreshUsersTree()
-        self.timer_users.start()
         self.timer_channels.start()
+        self.timer_users.start()
+        self.refreshUsersTree()
 
 
     def refreshUsersTree(self):

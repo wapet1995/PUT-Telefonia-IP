@@ -5,6 +5,7 @@ import threading
 import models
 import sha3
 from queue import Queue
+import traceback
 
 
 class Server:
@@ -118,10 +119,15 @@ class Server:
                     return "ERROR you are in this channel" # user was and is in channel
                 else:
                     # -----!!!-----
+                    if user_obj.channel_id is not None:
+                        old_channel = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
+                        self.BIG_DICT[channel.name].update(self.BIG_DICT[old_channel.name][user_obj.nick])  # moving user to another channel
+                        del self.BIG_DICT[old_channel.name][user_obj.nick]  # delete old registry
+                    else:
+                        # add new user to channel (dictionary)
+                        self.BIG_DICT[channel.name] = {user_obj.nick: [Queue(), False]}
 
-                    old_channel = user_obj.channel_id.name
-                    self.BIG_DICT[channel_name].update(self.BIG_DICT[old_channel][user_obj.nick])  # moving user to another channel
-                    del self.BIG_DICT[old_channel][user_obj.nick]  # delete old registry
+                    
 
                     # -----!!!-----
                     user_obj.channel_id = channel.id  # changing channel
@@ -171,7 +177,7 @@ class Server:
             if len(params_list)<2:
                 return "ERROR not enough parameters"
             
-            if self.DATABASE.query(models.Channel).filter_by(name=params_list[1]).exists():
+            if self.DATABASE.query(models.Channel).filter_by(name=params_list[1]).first() is not None:
                 return "ERROR channel exists"
 
             chan = models.Channel(params_list[1], params_list[2], "")
@@ -330,15 +336,18 @@ class Server:
                     response = self.commands(comm, params_list, user_obj)
                     client.send(response.encode('utf-8'))  # send response to client
 
+                    '''
                     if response == "JOINED":
-                        self.BIG_DICT[user_obj.channel_id.name][user_obj.nick][1] = False
+                        channel = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
+                        self.BIG_DICT[channel.name][user_obj.nick][1] = False
                         _, address = self.SERVER_UDP.recvfrom(1024)
-                        t_receive=threading.Thread(target=self.receiving_robot, args = (user_obj.channel_id.name, user_obj.nick))
-                        t_send=threading.Thread(target=self.sending_robot, args = (user_obj.channel_id.name,user_obj, address))
+                        t_receive=threading.Thread(target=self.receiving_robot, args = (channel.name, user_obj.nick))
+                        t_send=threading.Thread(target=self.sending_robot, args = (channel.name,user_obj, address))
 
-                        self.BIG_DICT[user_obj.channel_id.name][user_obj.nick][1] = True
+                        self.BIG_DICT[channel.name][user_obj.nick][1] = True
                         t_receive.start()
                         t_send.start()
+                    '''
 
                     if response == "DISCONNECTED":
                         client.close()
@@ -357,6 +366,7 @@ class Server:
                 self.DATABASE.commit()
                 self.DATABASE.close()  # close database connection for this thread
                 print("\n-- Management_connection error: ", str(e))
+                traceback.print_exc()
                 return
 
 
@@ -374,7 +384,10 @@ class Server:
     def copy_chan_2_dict(self):
         tmp_list = [i.name for i in self.DATABASE.query(models.Channel).all()]
         for i in tmp_list:
-            self.BIG_DICT[i] = {"queues": [Queue(), Queue()]}
+            self.BIG_DICT[str(i)] = None  # channel has 0 users
+
+        for j in self.BIG_DICT.items():
+            print(j)
 
     def run(self):
         """
