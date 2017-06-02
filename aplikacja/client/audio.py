@@ -10,16 +10,16 @@ class Audio:
 		self.RATE = 10240
 
 		# recording voice
-		p_speak = pyaudio.PyAudio()
-		self.SPEAK = p_speak.open(format = self.FORMAT,
+		self.p_speak = pyaudio.PyAudio()
+		self.SPEAK = self.p_speak.open(format = self.FORMAT,
 							channels = self.CHANNELS,
 							rate = self.RATE,
 							input = True,
 							frames_per_buffer = self.CHUNK)
 		
 		# playing voice
-		p_listen = pyaudio.PyAudio()
-		self.LISTEN = p_listen.open(format = self.FORMAT,
+		self.p_listen = pyaudio.PyAudio()
+		self.LISTEN = self.p_listen.open(format = self.FORMAT,
 							channels = self.CHANNELS,
 							rate = self.RATE,
 							output = True,
@@ -36,6 +36,6 @@ class Audio:
 	def exit(self):
 		self.SPEAK.close()
 		self.LISTEN.close()
-		p_speak.terminate()
-		p_listen.terminate()
+		self.p_speak.terminate()
+		self.p_listen.terminate()
 

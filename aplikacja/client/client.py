@@ -5,6 +5,7 @@ import sys
 import sha3
 import threading
 from audio import Audio
+import time
 
 class Client:
     def __init__(self, nick, server_ip_address, server_port, udp_port):
@@ -134,8 +135,10 @@ class Client:
     def record_and_send(self): # record and send voice
         while self.AUDIO_LOCK:
             try:
-                data = self.AUDIO.record()
+                #data = self.AUDIO.record()
+                data = "Stacjonarka"
                 self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, self.UDP_PORT))
+                time.sleep(2)
             except:
                 pass
         if self.AUDIO is not None:  # close audio stream
@@ -145,7 +148,9 @@ class Client:
         while self.AUDIO_LOCK:
             try:
                 data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
-                self.AUDIO.play(data)
+                #self.AUDIO.play(data)
+                print(data)
+                time.sleep(2)
             except:
                 pass
         if self.AUDIO is not None:  # close audio stream
