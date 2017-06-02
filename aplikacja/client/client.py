@@ -7,10 +7,10 @@ import threading
 from audio import Audio
 
 class Client:
-    def __init__(self, nick, my_ip_address, server_ip_address, server_port, udp_port):
+    def __init__(self, nick, server_ip_address, server_port, udp_port):
         self.SIZE_OF_BUFFER = 1024
         self.MY_NICK = nick
-        self.MY_IP_ADDRESS = my_ip_address
+        self.MY_IP_ADDRESS = None
         self.SERVER_IP_ADDRESS = server_ip_address
         self.SERVER_PORT = server_port
         self.CONNECTION = None
@@ -60,6 +60,7 @@ class Client:
             print("\n-- Could not connect to server", str(e))
             return False
 
+        self.MY_IP_ADDRESS = str(s.getsockname()[0])
         admin_password = self.hashAdminPassword(admin_password)
         s.settimeout(10.0)
         s.send(b"CONNECT " + self.MY_NICK.encode('utf-8') + b" " + admin_password.encode('utf-8'))
@@ -110,12 +111,14 @@ class Client:
         if response[0] == "JOINED":
             self.CURRENT_CHANNEL = channel_name
             # !!!
+            
             self.AUDIO = Audio()
             self.AUDIO_LOCK = True
             t_record = threading.Thread(target=self.record_and_send, args = ())
             t_player = threading.Thread(target=self.receive_and_play, args = ())
             t_record.start()
             t_player.start()
+            
             # !!!
             return True
         elif response[0] == "NOT_JOINED":

@@ -198,13 +198,13 @@ class GUI(QMainWindow):
             server_port = conn.port_number.value()
             nick = str(conn.nick.text())
             admin_password = str(conn.admin_password.text())
-            self.CONNECTION = Client(nick, "127.0.0.1", server_ip, server_port) # TODO
+            self.CONNECTION = Client(nick, server_ip, server_port, 60000) # TODO
             if self.CONNECTION.connect(admin_password): # return True
                 print("Połączono")
                 self.statusBar().showMessage('Connected')
                 self.conn_status.setText("Server IP: " + server_ip)
                 self.conn_status.setStyleSheet("color: green;")
-                self.my_ip_addr.setText("My IP: " + str(self.CONNECTION.CONNECTION.getsockname()[0]))
+                self.my_ip_addr.setText("My IP: " + self.CONNECTION.MY_IP_ADDRESS)
                 self.connectAction.setEnabled(False)
                 self.disconnectAction.setEnabled(True)
                 if self.CONNECTION.IAM_ADMIN:

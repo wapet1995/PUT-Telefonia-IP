@@ -12,7 +12,7 @@ class Server:
     def __init__(self):
         # technical parameters
         self.SIZE_OF_BUFFER = 1024  # max size of packets sending through socket
-        self.SERVER_IP = '127.0.0.1'
+        self.SERVER_IP = '192.168.0.12'
         self.SERVER_PORT = 50000
         self.SERVER_PORT_UDP = 60000
         self.MAX_USERS = 5
@@ -336,7 +336,7 @@ class Server:
                     response = self.commands(comm, params_list, user_obj)
                     client.send(response.encode('utf-8'))  # send response to client
 
-                    '''
+                    
                     if response == "JOINED":
                         channel = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
                         self.BIG_DICT[channel.name][user_obj.nick][1] = False
@@ -347,7 +347,7 @@ class Server:
                         self.BIG_DICT[channel.name][user_obj.nick][1] = True
                         t_receive.start()
                         t_send.start()
-                    '''
+                    
 
                     if response == "DISCONNECTED":
                         client.close()
@@ -385,9 +385,6 @@ class Server:
         tmp_list = [i.name for i in self.DATABASE.query(models.Channel).all()]
         for i in tmp_list:
             self.BIG_DICT[str(i)] = None  # channel has 0 users
-
-        for j in self.BIG_DICT.items():
-            print(j)
 
     def run(self):
         """

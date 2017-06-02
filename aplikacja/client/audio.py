@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import pyaudio
+
 class Audio:
 	def __init__(self):
 		self.CHUNK = 1024
