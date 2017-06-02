@@ -6,6 +6,7 @@ import sha3
 import threading
 from audio import Audio
 import time
+from queue import Queue
 
 class Client:
     def __init__(self, nick, server_ip_address, server_port, udp_port):
@@ -25,6 +26,7 @@ class Client:
         self.UDP_PORT = udp_port
         self.AUDIO_LOCK = False
         self.AUDIO = None
+
 
 
     # --------------------------    Auxiliary functions      -------------------------------
@@ -139,6 +141,7 @@ class Client:
                 #data = self.AUDIO.record()
                 data = "Stacjonarka"
                 self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, self.UDP_PORT))
+                print("Wysłane:", data)
                 time.sleep(2)
             except:
                 pass
@@ -149,13 +152,14 @@ class Client:
         print("Odbieranie audio")
         while self.AUDIO_LOCK:
             try:
-                self.UDP_CONNECTION.settimeout(2)
+                self.UDP_CONNECTION.settimeout(5)
                 data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
                 self.UDP_CONNECTION.settimeout(None)
                 #self.AUDIO.play(data)
                 print(data.encode('utf-8'))
                 time.sleep(2)
             except socket.timeout:
+                print("NIC NIE DOSTAŁEM :(")
                 continue
             except:
                 pass
@@ -270,99 +274,6 @@ class Client:
         else:
             print(' '.join(response))
             return False
-
-
-
-    # --------------------    TEST methods   -------------------------
-    def print_vars(self):
-        for k, v in vars(self).items():
-            print(str(k) + ":\t" + str(v))
-
-    def help(self):
-        print("""
-                    USER
-                c - connect to server
-                gcl - get channels list
-                jc - join channel
-                gcu - get channel users
-                ec - exit channel
-                d - disconnect
-
-                    ADMIN
-                addc - add channel
-                delc - delete channel
-                bip - block ip
-                ubip - unblock ip
-                bn - block nickname
-                ubn - unblock nickname
-
-                h - help
-                q - exit program
-                v - print all class variables
-            """)
-        
-    def test(self):
-        self.help()
-        while True:
-            try:
-                opt = input("Option: ")
-                opt = opt.split(" ")
-                if opt[0] == "c":
-                    self.connect()
-                elif opt[0] == "gcl":
-                    self.getChannelsList()
-                elif opt[0] == "jc":
-                    chan = input("Channel name: ")
-                    chan_pass = input("Channel password: ")
-                    self.joinChannel(chan, chan_pass)
-                elif opt[0] == "gcu":
-                    chan = input("Channel name: ")
-                    self.getChannelUsers(chan)
-                elif opt[0] == "ec":
-                    self.exitChannel()
-                elif opt[0] == "d":
-                    self.disconnect()
-                elif opt[0] == "v":
-                    self.print_vars()
-                elif opt[0] == "q":
-                    return
-                elif opt[0] == "h":
-                    self.help()
-                elif opt[0] == "addc":
-                    admin_pass = input("Admin password: ")
-                    admin_pass = self.hashAdminPassword(admin_pass)
-                    chan = input("Channel name: ")
-                    chan_pass = input("Channel password: ")
-                    self.addChannel(admin_pass, chan, chan_pass)
-                elif opt[0] == "delc":
-                    admin_pass = input("Admin password: ")
-                    admin_pass = self.hashAdminPassword(admin_pass)
-                    chan = input("Channel name: ")
-                    self.delChannel(admin_pass, chan)
-                elif opt[0] == "bip":
-                    admin_pass = input("Admin password: ")
-                    admin_pass = self.hashAdminPassword(admin_pass)
-                    ip = input("IP address: ")
-                    self.blockIP(admin_pass, ip)
-                elif opt[0] == "ubip":
-                    admin_pass = input("Admin password: ")
-                    admin_pass = self.hashAdminPassword(admin_pass)
-                    ip = input("IP address: ")
-                    self.unblockIP(admin_pass, ip)
-                elif opt[0] == "bn":
-                    admin_pass = input("Admin password: ")
-                    admin_pass = self.hashAdminPassword(admin_pass)
-                    nick = input("Nickname: ")
-                    self.blockNick(admin_pass, nick)
-                elif opt[0] == "ubn":
-                    admin_pass = input("Admin password: ")
-                    admin_pass = self.hashAdminPassword(admin_pass)
-                    nick = input("Nickname: ")
-                    self.unblockNick(admin_pass, nick)
-                else:
-                    print("Choose option")
-            except Exception as e:
-                print("\nBad parameter " + str(e))
 
 
 

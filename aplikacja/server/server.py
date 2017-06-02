@@ -97,8 +97,10 @@ class Server:
             try:
                 self.SERVER_UDP.settimeout(2)
                 data, address = self.SERVER_UDP.recvfrom(1024)
+                print("UDP mam:", data.encode('utf-8'))
                 self.SERVER_UDP.settimeout(None)
             except socket.timeout:
+                print("timeoucik")
                 continue
             except:
                 print("Receiving robot konczy")
@@ -110,10 +112,12 @@ class Server:
         while True:
             nick, data = self.BIG_LIST[channel].get()
             clients = self.get_channel_users(channel)
+            print("klienci:", clients)
             for cli in clients:
                 if cli[0] != nick:
                     try:
                         self.SERVER_UDP.sendto(data, (cli[1],cli[2]))
+                        print("UDP wysłałem:", data.encode('utf-8'))
                     except:
                         print("Sending robot konczy")
                         return
@@ -343,7 +347,9 @@ class Server:
         if client_id is not None:
             client.send(message.encode('utf-8'))  # login successful
             user_obj = self.DATABASE.query(models.User).filter_by(id=client_id).first()  # get User object
-            user_queue = Queue()
+            
+            t_receive = threading.Thread(target=self.receiving_robot, args=(user_obj.nick,))
+            t_receive.start()
         else:
             client.send(message.encode('utf-8'))  # login NOT successful
             client.close()
@@ -359,10 +365,6 @@ class Server:
 
                     response = self.commands(comm, params_list, user_obj)
                     client.send(response.encode('utf-8'))  # send response to client
-                        
-                    if response == "CONNECTED" or response == "CONECTED-a":
-                        t_receive = threading.Thread(target=self.receiving_robot, args=(user_obj.nick))
-                        t_receive.start()
 
                     if response == "DISCONNECTED":
                         client.close()
