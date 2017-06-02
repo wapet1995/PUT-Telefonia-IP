@@ -65,6 +65,7 @@ class Client:
         admin_password = self.hashAdminPassword(admin_password)
         s.settimeout(10.0)
         s.send(b"CONNECT " + self.MY_NICK.encode('utf-8') + b" " + admin_password.encode('utf-8'))
+        self.udp_connection()
         try:
             response = s.recv(self.SIZE_OF_BUFFER).decode('utf-8')
         except:
@@ -74,12 +75,10 @@ class Client:
 
         if response == "CONNECTED":
             self.CONNECTION = s
-            self.udp_connection()
             return True
         elif response == "CONNECTED-a":
             self.CONNECTION = s
             self.IAM_ADMIN = True
-            self.udp_connection()
             return True
 
         elif response == "NOT_CONNECTED":
@@ -91,6 +90,7 @@ class Client:
 
     def udp_connection(self):
         self.UDP_CONNECTION = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.UDP_CONNECTION.sendto(b"siemka", (self.SERVER_IP_ADDRESS, self.UDP_PORT))
 
     def getChannelsList(self):
         self.CONNECTION.send(b"ASK_CHANNELS")
@@ -133,7 +133,7 @@ class Client:
 
     # ------------------------   UDP AUDIO   --------------------------------------
     def record_and_send(self): # record and send voice
-        self.UDP_CONNECTION.sendto(b"siemka", (self.SERVER_IP_ADDRESS, self.UDP_PORT))
+        print("Wysylanie audio")
         while self.AUDIO_LOCK:
             try:
                 #data = self.AUDIO.record()
@@ -146,16 +146,17 @@ class Client:
             self.AUDIO.exit()
 
     def receive_and_play(self):
+        print("Odbieranie audio")
         while self.AUDIO_LOCK:
             try:
-                self.UDP_CONNECTION.settimeout(1)
+                self.UDP_CONNECTION.settimeout(2)
                 data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
-                #self.AUDIO.play(data)
-                print(data)
-                time.sleep(2)
                 self.UDP_CONNECTION.settimeout(None)
-            except socket.Timeouterror:
-                pass
+                #self.AUDIO.play(data)
+                print(data.encode('utf-8'))
+                time.sleep(2)
+            except socket.timeout:
+                continue
             except:
                 pass
         if self.AUDIO is not None:  # close audio stream
