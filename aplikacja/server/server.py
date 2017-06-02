@@ -73,7 +73,11 @@ class Server:
 
     def receiving_robot(self, channel_name, my_name):
         while self.UDP_LOCK and self.BIG_DICT[channel_name][my_name][1]:
-            data, address = self.SERVER_UDP.recvfrom(1024)
+            try:
+                data, address = self.SERVER_UDP.recvfrom(1024)
+            except:
+                print("Receiving robot konczy")
+                return
             for user in self.BIG_DICT[channel_name].items():
                 if user[0] == my_name:
                     continue
@@ -85,7 +89,11 @@ class Server:
         # user_address = ('127.0.0.1', 1234)
         queue = self.BIG_DICT[channel_name][user_obj.nick][0]
         while self.UDP_LOCK and self.BIG_DICT[channel_name][user_obj.nick][1]:
-            self.SERVER_UDP.sendto(queue.get(), user_address)
+            try:
+                self.SERVER_UDP.sendto(queue.get(), user_address)
+            except:
+                print("Sending robot konczy")
+                return
 
     def commands(self, comm, params_list, user_obj):
         """
@@ -127,8 +135,6 @@ class Server:
                     else:
                         # add new user to channel (dictionary)
                         self.BIG_DICT[channel.name] = {user_obj.nick: [Queue(), False]}
-
-                    
 
                     # -----!!!-----
                     user_obj.channel_id = channel.id  # changing channel
@@ -343,8 +349,8 @@ class Server:
                         self.BIG_DICT[channel.name][user_obj.nick][1] = False
                         _, address = self.SERVER_UDP.recvfrom(1024)
                         self.UDP_LOCK = True
-                        t_receive=threading.Thread(target=self.receiving_robot, args = (channel.name, user_obj.nick))
-                        t_send=threading.Thread(target=self.sending_robot, args = (channel.name,user_obj, address))
+                        t_receive = threading.Thread(target=self.receiving_robot, args = (channel.name, user_obj.nick))
+                        t_send = threading.Thread(target=self.sending_robot, args = (channel.name,user_obj, address))
 
                         self.BIG_DICT[channel.name][user_obj.nick][1] = True
                         t_receive.start()

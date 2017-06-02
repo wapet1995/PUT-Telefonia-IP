@@ -115,7 +115,7 @@ class Client:
             self.CURRENT_CHANNEL = channel_name
             # !!!
             
-            self.AUDIO = Audio()
+            #self.AUDIO = Audio()
             self.AUDIO_LOCK = True
             t_record = threading.Thread(target=self.record_and_send, args = ())
             t_player = threading.Thread(target=self.receive_and_play, args = ())
@@ -133,6 +133,7 @@ class Client:
 
     # ------------------------   UDP AUDIO   --------------------------------------
     def record_and_send(self): # record and send voice
+        self.UDP_CONNECTION.sendto(b"siemka", (self.SERVER_IP_ADDRESS, self.UDP_PORT))
         while self.AUDIO_LOCK:
             try:
                 #data = self.AUDIO.record()
@@ -163,7 +164,8 @@ class Client:
         self.CONNECTION.send(b"ASK_CHAN_USERS " + channel_name.encode('utf-8'))
         response = self.receiveSafe()
 
-
+        print(type(response))
+        print(response)
         if response[0] == "CHAN_USERS":
             users = response[1].split(",")
 
