@@ -11,19 +11,19 @@ class Audio:
 
 		# recording voice
 		p_speak = pyaudio.PyAudio()
-		self.SPEAK = p_speak.open(format = FORMAT,
-							channels = CHANNELS,
-							rate = RATE,
+		self.SPEAK = p_speak.open(format = self.FORMAT,
+							channels = self.CHANNELS,
+							rate = self.RATE,
 							input = True,
-							frames_per_buffer = CHUNK)
+							frames_per_buffer = self.CHUNK)
 		
 		# playing voice
 		p_listen = pyaudio.PyAudio()
-		self.LISTEN = p_listen.open(format = FORMAT,
-							channels = CHANNELS,
-							rate = RATE,
+		self.LISTEN = p_listen.open(format = self.FORMAT,
+							channels = self.CHANNELS,
+							rate = self.RATE,
 							output = True,
-							frames_per_buffer = CHUNK)
+							frames_per_buffer = self.CHUNK)
 
 
 	def record(self):

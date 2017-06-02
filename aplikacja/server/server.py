@@ -18,6 +18,7 @@ class Server:
         self.MAX_USERS = 5
         self.SERVER = None  # TCP socket
         self.SERVER_UDP = None
+        self.UDP_LOCK = True
 
         # logical parameters
         self.DATABASE = models.database_connect()
@@ -71,7 +72,7 @@ class Server:
         print("\n-- UDP socket opened on " + str(self.SERVER_IP) + ":" + str(self.SERVER_PORT_UDP))
 
     def receiving_robot(self, channel_name, my_name):
-        while self.BIG_DICT[channel_name][my_name][1]:
+        while self.UDP_LOCK and self.BIG_DICT[channel_name][my_name][1]:
             data, address = self.SERVER_UDP.recvfrom(1024)
             for user in self.BIG_DICT[channel_name].items():
                 if user[0] == my_name:
@@ -83,7 +84,7 @@ class Server:
     def sending_robot(self, channel_name, user_obj, user_address):
         # user_address = ('127.0.0.1', 1234)
         queue = self.BIG_DICT[channel_name][user_obj.nick][0]
-        while self.BIG_DICT[channel_name][user_obj.nick][1]:
+        while self.UDP_LOCK and self.BIG_DICT[channel_name][user_obj.nick][1]:
             self.SERVER_UDP.sendto(queue.get(), user_address)
 
     def commands(self, comm, params_list, user_obj):
@@ -341,6 +342,7 @@ class Server:
                         channel = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
                         self.BIG_DICT[channel.name][user_obj.nick][1] = False
                         _, address = self.SERVER_UDP.recvfrom(1024)
+                        self.UDP_LOCK = True
                         t_receive=threading.Thread(target=self.receiving_robot, args = (channel.name, user_obj.nick))
                         t_send=threading.Thread(target=self.sending_robot, args = (channel.name,user_obj, address))
 
@@ -354,31 +356,24 @@ class Server:
                         print("# Klient " + ip + " rozłączył się")
                         return
                 else:
+                    self.UDP_LOCK = False
                     client.close()
+                    self.SERVER_UDP.close()
                     self.DATABASE.delete(user_obj)
                     self.DATABASE.commit()
                     self.DATABASE.close()  # close database connection for this thread
                     print("# Klient " + ip + " zerwał połączenie")
                     return
             except Exception as e:
+                self.UDP_LOCK = False
                 client.close()
+                self.SERVER_UDP.close()
                 self.DATABASE.delete(user_obj)
                 self.DATABASE.commit()
                 self.DATABASE.close()  # close database connection for this thread
                 print("\n-- Management_connection error: ", str(e))
                 traceback.print_exc()
                 return
-
-
-    def init_audio_connection(self, channel_name, user_obj):
-        """
-        I assume that user is not in channel_name, because this was checked before
-        """
-        t_proxy=threading.Thread(target=self.udp_proxy, args = (user_queue,))
-        t_proxy.start()
-
-        t_send=threading.Thread(target=self.management_connection, args = (user_queue,))
-        t_send.start()
 
 
     def copy_chan_2_dict(self):
