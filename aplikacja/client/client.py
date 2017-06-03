@@ -9,7 +9,7 @@ import time
 from queue import Queue
 
 class Client:
-    def __init__(self, nick, server_ip_address, server_port, udp_port):
+    def __init__(self, nick, server_ip_address, server_port):
         self.SIZE_OF_BUFFER = 1024
         self.MY_NICK = nick
         self.MY_IP_ADDRESS = None
@@ -23,7 +23,7 @@ class Client:
 
         # audio UDP
         self.UDP_CONNECTION = None
-        self.UDP_PORT = udp_port
+        self.UDP_MY_PORT = None
         self.AUDIO_LOCK = False
         self.AUDIO = None
 
@@ -43,7 +43,7 @@ class Client:
         self.CONNECTION.settimeout(10.0)
         try:
             response = self.CONNECTION.recv(self.SIZE_OF_BUFFER).decode('utf-8')
-            print("\tKomunikat:" + response)
+            #print("\tKomunikat:" + response)
         except:
             # time exceeded
             return False
@@ -67,7 +67,6 @@ class Client:
         admin_password = self.hashAdminPassword(admin_password)
         s.settimeout(10.0)
         s.send(b"CONNECT " + self.MY_NICK.encode('utf-8') + b" " + admin_password.encode('utf-8'))
-        self.udp_connection()
         try:
             response = s.recv(self.SIZE_OF_BUFFER).decode('utf-8')
         except:
@@ -77,10 +76,12 @@ class Client:
 
         if response == "CONNECTED":
             self.CONNECTION = s
+            self.init_UDP_connection()
             return True
         elif response == "CONNECTED-a":
             self.CONNECTION = s
             self.IAM_ADMIN = True
+            self.init_UDP_connection()
             return True
 
         elif response == "NOT_CONNECTED":
@@ -89,10 +90,6 @@ class Client:
         else:
             print(response)
             return False
-
-    def udp_connection(self):
-        self.UDP_CONNECTION = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.UDP_CONNECTION.sendto(b"siemka", (self.SERVER_IP_ADDRESS, self.UDP_PORT))
 
     def getChannelsList(self):
         self.CONNECTION.send(b"ASK_CHANNELS")
@@ -109,17 +106,19 @@ class Client:
 
     def joinChannel(self, channel_name, password):
         self.AUDIO_LOCK = False  # stop previous audio stream
-        self.CONNECTION.send(b"JOIN " + channel_name.encode('utf-8') + b" " + password.encode('utf-8'))
+        self.CONNECTION.send(b"JOIN " + channel_name.encode('utf-8') + b" "\
+                             + password.encode('utf-8') + b" " + str(self.UDP_MY_PORT).encode('utf-8'))
         response = self.receiveSafe()
 
 
         if response[0] == "JOINED":
             self.CURRENT_CHANNEL = channel_name
+            server_udp_port = response[1]
             # !!!
             
             #self.AUDIO = Audio()
             self.AUDIO_LOCK = True
-            t_record = threading.Thread(target=self.record_and_send, args = ())
+            t_record = threading.Thread(target=self.record_and_send, args = (server_udp_port,))
             t_player = threading.Thread(target=self.receive_and_play, args = ())
             t_record.start()
             t_player.start()
@@ -134,17 +133,28 @@ class Client:
             return False
 
     # ------------------------   UDP AUDIO   --------------------------------------
-    def record_and_send(self): # record and send voice
+
+    def init_UDP_connection(self):
+        tmp = 55555
+        self.UDP_CONNECTION = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            self.UDP_CONNECTION.bind((self.MY_IP_ADDRESS,tmp))
+        except Exception as e:
+            print("UDP init error:", str(e))
+        self.UDP_MY_PORT = tmp
+
+
+    def record_and_send(self, server_udp_port): # record and send voice
         print("Wysylanie audio")
         while self.AUDIO_LOCK:
             try:
                 #data = self.AUDIO.record()
-                data = b"Stacjonarka"
-                self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, self.UDP_PORT))
+                data = b"HEEEEEEEEEEEEEEEEEJJJJJJ"
+                self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, int(server_udp_port)))
                 print("Wysłane:", data)
-                time.sleep(2)
             except Exception as e:
                 print("UDP sending error:", e)
+            time.sleep(2)
         if self.AUDIO is not None:  # close audio stream
             self.AUDIO.exit()
 
@@ -152,14 +162,12 @@ class Client:
         print("Odbieranie audio")
         while self.AUDIO_LOCK:
             try:
-                self.UDP_CONNECTION.settimeout(5)
+                self.UDP_CONNECTION.settimeout(3)
                 data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
                 self.UDP_CONNECTION.settimeout(None)
                 #self.AUDIO.play(data)
-                print(data.decode('utf-8'))
-                time.sleep(2)
+                print("Odebrane:", data.decode('utf-8'))
             except socket.timeout:
-                print("NIC NIE DOSTAŁEM :(")
                 continue
             except:
                 pass

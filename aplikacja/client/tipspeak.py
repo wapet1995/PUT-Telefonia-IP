@@ -198,7 +198,7 @@ class GUI(QMainWindow):
             server_port = conn.port_number.value()
             nick = str(conn.nick.text())
             admin_password = str(conn.admin_password.text())
-            self.CONNECTION = Client(nick, server_ip, server_port, 60000) # TODO
+            self.CONNECTION = Client(nick, server_ip, server_port)
             if self.CONNECTION.connect(admin_password): # return True
                 print("Połączono")
                 self.statusBar().showMessage('Connected')

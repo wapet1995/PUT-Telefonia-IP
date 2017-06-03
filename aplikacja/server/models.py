@@ -12,15 +12,13 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     nick = Column(String(100), nullable=False)
     ip_address = Column(String(15), nullable=False)
-    udp_port = Column(Integer)
     channel_id = Column(Integer, ForeignKey('channel.id'), nullable=True)
     is_admin = Column(Boolean, default=False)
 
-    def __init__(self, nick, ip_address, is_admin, udp_port):
+    def __init__(self, nick, ip_address, is_admin):
         self.nick = nick
         self.ip_address = ip_address
         self.is_admin = is_admin
-        self.udp_port = udp_port
 
 class Channel(Base):
     __tablename__ = 'channel'

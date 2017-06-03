@@ -4,7 +4,7 @@ import socket
 import threading
 import models
 import sha3
-from queue import Queue
+from queue import Queue, Empty
 import traceback
 
 
@@ -17,20 +17,29 @@ class Server:
         self.SERVER_PORT_UDP = 60000
         self.MAX_USERS = 5
         self.SERVER = None  # TCP socket
-        self.SERVER_UDP = None
         self.GLOBAL_THREAD_LOCK = True
 
         # logical parameters
         self.DATABASE = models.database_connect()
         self.ADMIN_PASSWORD = None
-        self.THREADS_LIST = []
+
+
         """
         self.BIG_LIST = {
-                        "kanal1": Queue(), "kanal2": Queue()
+                        "kanal1": [Queue(), udp_socket, port], "kanal2": [Queue(), udp_socket, port]
                         }
         """
         self.BIG_LIST = {}
-        self.USERS_IN_CHANNELS = {}
+        """
+        self.USERS_IN_CHANNEL = {
+                    "kanal1": [
+                                ["192.168.0.12", 67890],
+                                ["192.168.0.11", 12345]
+                            ]
+                    }
+        """
+        self.USERS_IN_CHANNEL = {}
+        self.UDP_PORT_NUMBERS = 60001
 
 
     # --------------------------    Auxiliary functions      -------------------------------
@@ -46,34 +55,32 @@ class Server:
         else:
             return False
 
-    # ------------- BIG LIST --------------------------
+    # ------------- BIG LIST ---- AND ---- USERS IN CHANNEL ----------------
 
     def set_BIG_LIST(self):
         chans = self.DATABASE.query(models.Channel).all()
         for chan in chans:
             if chan.name not in self.BIG_LIST:
-                self.BIG_LIST[chan.name] = Queue()
-                tmp = threading.Thread(target=self.sending_robot, args=(chan.name,))
-                tmp.start()
-                self.THREADS_LIST.append(tmp)
+                sock = self.open_UDP_socket(self.UDP_PORT_NUMBERS)
+                self.BIG_LIST[chan.name] = [Queue(), sock, self.UDP_PORT_NUMBERS]
+                self.UDP_PORT_NUMBERS += 1
 
-    def get_channel_users(self, channel_name):
-        # except me
-        channel = self.DATABASE.query(models.Channel).filter_by(name=channel_name).first()
-        addr_list = []
-        for i in channel.users:
-            tmp = [i.nick, i.ip_address, i.udp_port]
-            addr_list.append(tmp)
-        return addr_list
-
+                t_receive = threading.Thread(target=self.receiving_robot, args=(chan.name,))
+                t_send = threading.Thread(target=self.sending_robot, args=(chan.name,))
+                t_receive.start()
+                t_send.start()
+            if chan.name not in self.USERS_IN_CHANNEL:
+                self.USERS_IN_CHANNEL[chan.name] = []  # set empty list for all channels
 
     # ------------------------------------------------------------------------------------
-    def open_socket(self):
+
+    def open_TCP_socket(self):
         """
         Initialization socket
         """
         try:
             self.SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.SERVER.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.SERVER.bind((self.SERVER_IP, self.SERVER_PORT))
             self.SERVER.listen(self.MAX_USERS)
         except Exception as e:
@@ -81,57 +88,43 @@ class Server:
             sys.exit(1)
         print("\n-- TCP socket opened on " + str(self.SERVER_IP) + ":" + str(self.SERVER_PORT))
 
-    def create_udp_socket(self):
-        try:
-            self.SERVER_UDP = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.SERVER_UDP.bind((self.SERVER_IP, self.SERVER_PORT_UDP))
-        except Exception as e:
-            print("\n-- Could not open UDP socket", str(e))
-            sys.exit(1)
-        print("\n-- UDP socket opened on " + str(self.SERVER_IP) + ":" + str(self.SERVER_PORT_UDP))
 
     # ----------------------   UDP connection   --------------------------
 
-    def receiving_robot(self, nick):
+    def open_UDP_socket(self, port):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.bind((self.SERVER_IP, port))
+        except Exception as e:
+            print("\n-- Could not open UDP socket on", port, "with error:", str(e))
+            sys.exit(1)
+        print("\n-- UDP socket opened on " + str(self.SERVER_IP) + ":" + str(port))
+        return sock
+
+
+    def receiving_robot(self, channel):
+        sock = self.BIG_LIST[channel][1]
+        sock.settimeout(1)
         while self.GLOBAL_THREAD_LOCK:
             try:
-                channel = self.USERS_IN_CHANNELS[nick]
-            except:
-                continue
-            try:
-                self.SERVER_UDP.settimeout(2)
-                data, address = self.SERVER_UDP.recvfrom(1024)
-                print("UDP mam:", data.decode('utf-8'))
-                self.SERVER_UDP.settimeout(None)
+                data, addr = sock.recvfrom(1024)
+                print("Odebrano:", data.decode('utf-8'))
             except socket.timeout:
-                print("timeoucik")
                 continue
-            except Exception as e:
-                print("Receiving robot konczy", e)
-                return
-            packet = [nick, data]
-            self.BIG_LIST[channel].put(packet)
+            packet = [addr[0], data]
+            self.BIG_LIST[channel][0].put(packet)
 
     def sending_robot(self, channel):
-        print("sending robot zaczyna")
+        sock = self.BIG_LIST[channel][1]
         while self.GLOBAL_THREAD_LOCK:
             try:
-                nick, data = self.BIG_LIST[channel].get(timeout=4)
-            except:
-                print("timeout sending robota")
+                ip, data = self.BIG_LIST[channel][0].get(timeout=1)
+            except Empty:
                 continue
-            clients = self.get_channel_users(channel)
-            print(clients)
-            for cli in clients:
-                if cli[0] != nick:
-                    try:
-                        self.SERVER_UDP.sendto(data, (cli[1],cli[2]))
-                        print("UDP wysłałem:", data.encode('utf-8'))
-                    except:
-                        print("Sending robot konczy")
-                        return
-                else:
-                    print("Do siebie nie wysylam")
+            for usr in self.USERS_IN_CHANNEL[channel]:
+                if usr[0] != ip:
+                    sock.sendto(data, (usr[0],usr[1]))
+                    print("UDP wyslano:", usr)
 
     #  ----------------------------------------------------------------------
 
@@ -155,22 +148,26 @@ class Server:
         elif comm == "JOIN":
             """
             Request for join channel
-            example: JOIN name password
+            example: JOIN name password udp_port
             """
-            if len(params_list)<2:
+            if len(params_list)<3:
                 return "ERROR channel name or password not given"
 
             channel = self.DATABASE.query(models.Channel).filter_by(name=params_list[0]).first()
+            old_channel = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
             if channel is None:
                 return "ERROR channel does not exists"
             if params_list[1] == channel.password:  # CHECK PASSWORD: TODO encryption ???
                 if user_obj.channel_id == channel.id:
                     return "ERROR you are in this channel" # user was and is in channel
                 else:
+                    tmp = [user_obj.ip_address, int(params_list[2])]
+                    if old_channel is not None and tmp in self.USERS_IN_CHANNEL[old_channel.name]:
+                        self.USERS_IN_CHANNEL[old_channel.name].remove(tmp)
                     user_obj.channel_id = channel.id  # changing channel
-                    self.USERS_IN_CHANNELS[user_obj.nick] = channel.name
+                    self.USERS_IN_CHANNEL[channel.name].append(tmp)
                     self.DATABASE.commit()
-                    return "JOINED"
+                    return "JOINED " + str(self.BIG_LIST[channel.name][2])
             else:
                 return "NOT_JOINED"
 
@@ -201,6 +198,7 @@ class Server:
             Request for delete user from server users list
             example: DISCONNECT
             """
+            user_obj.channel = None
             self.DATABASE.delete(user_obj)
             self.DATABASE.commit()
             self.DATABASE.close()  # close database connection for this thread
@@ -301,7 +299,6 @@ class Server:
         client.settimeout(10.0)
         try:
             data = client.recv(self.SIZE_OF_BUFFER)  # expected command: CONNECT name
-            _, address = self.SERVER_UDP.recvfrom(1024)
         except Exception as e:
             print("-- Timeout exceeded:", e)
             return "Timeout exceeded", None
@@ -331,7 +328,7 @@ class Server:
                 return "NOT_CONNECTED", None
 
             try:
-                self.DATABASE.add(models.User(nick, ip, is_admin, address[1]))
+                self.DATABASE.add(models.User(nick, ip, is_admin))
                 self.DATABASE.commit()
                 user_id = self.DATABASE.query(models.User).filter_by(nick=nick).first()
                 if user_id.is_admin:
@@ -354,14 +351,10 @@ class Server:
         Processes commands from client.
         """
         ip, port = client.getpeername()  # ip and port of client
-
         message, client_id = self.login(client, ip)
         if client_id is not None:
             client.send(message.encode('utf-8'))  # login successful
             user_obj = self.DATABASE.query(models.User).filter_by(id=client_id).first()  # get User object
-            
-            t_receive = threading.Thread(target=self.receiving_robot, args=(user_obj.nick,))
-            t_receive.start()
         else:
             client.send(message.encode('utf-8'))  # login NOT successful
             client.close()
@@ -384,7 +377,6 @@ class Server:
                         return
                 else:
                     client.close()
-                    self.SERVER_UDP.close()
                     self.DATABASE.delete(user_obj)
                     self.DATABASE.commit()
                     self.DATABASE.close()  # close database connection for this thread
@@ -392,7 +384,6 @@ class Server:
                     return
             except Exception as e:
                 client.close()
-                self.SERVER_UDP.close()
                 self.DATABASE.delete(user_obj)
                 self.DATABASE.commit()
                 self.DATABASE.close()  # close database connection for this thread
@@ -406,8 +397,7 @@ class Server:
         Listen to new connection and run threads for them.
         """
         self.setAdminPassword("admin")
-        self.open_socket()
-        self.create_udp_socket()
+        self.open_TCP_socket()
         self.set_BIG_LIST()
         while True:
             try:
@@ -421,10 +411,15 @@ class Server:
             except KeyboardInterrupt:
                 self.GLOBAL_THREAD_LOCK = False
                 self.DATABASE.close()
-                self.SERVER_UDP.close()
                 self.SERVER.close()
                 print("\n-- Closing server")
-                return
+                sys.exit(0)
+            except:
+                self.GLOBAL_THREAD_LOCK = False
+                self.DATABASE.close()
+                self.SERVER.close()
+                print("\n-- Force closing server")
+                sys.exit(0)
 
 
 if __name__ == "__main__": 
