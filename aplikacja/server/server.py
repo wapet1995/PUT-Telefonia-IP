@@ -108,7 +108,7 @@ class Server:
         while self.GLOBAL_THREAD_LOCK:
             try:
                 data, addr = sock.recvfrom(1024)
-                print("Odebrano:", data.decode('utf-8'))
+                print(addr, "odebrano", data.decode('utf-8'))
             except socket.timeout:
                 continue
             packet = [addr[0], data]
@@ -124,7 +124,7 @@ class Server:
             for usr in self.USERS_IN_CHANNEL[channel]:
                 if usr[0] != ip:
                     sock.sendto(data, (usr[0],usr[1]))
-                    print("UDP wyslano:", usr)
+                    print("wyslano", data.decode('utf-8'), "do", usr)
 
     #  ----------------------------------------------------------------------
 
@@ -164,8 +164,10 @@ class Server:
                     tmp = [user_obj.ip_address, int(params_list[2])]
                     if old_channel is not None and tmp in self.USERS_IN_CHANNEL[old_channel.name]:
                         self.USERS_IN_CHANNEL[old_channel.name].remove(tmp)
-                    user_obj.channel_id = channel.id  # changing channel
+                    
                     self.USERS_IN_CHANNEL[channel.name].append(tmp)
+                    user_obj.channel_id = channel.id  # changing channel
+                    user_obj.udp_port = tmp[1]
                     self.DATABASE.commit()
                     return "JOINED " + str(self.BIG_LIST[channel.name][2])
             else:
@@ -189,7 +191,10 @@ class Server:
             """
             Request for delete user from channel
             """
-            user_obj.channel = None
+            chan = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
+            tmp = [user_obj.ip_address, user_obj.udp_port]
+            self.USERS_IN_CHANNEL[chan.name].remove(tmp)
+            user_obj.channel_id = None
             self.DATABASE.commit()
             return "CHAN_EXITED"
 
@@ -198,7 +203,10 @@ class Server:
             Request for delete user from server users list
             example: DISCONNECT
             """
-            user_obj.channel = None
+            chan = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
+            tmp = [user_obj.ip_address, user_obj.udp_port]
+            self.USERS_IN_CHANNEL[chan.name].remove(tmp)
+            user_obj.channel_id = None
             self.DATABASE.delete(user_obj)
             self.DATABASE.commit()
             self.DATABASE.close()  # close database connection for this thread

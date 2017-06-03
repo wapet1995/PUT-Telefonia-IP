@@ -12,6 +12,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     nick = Column(String(100), nullable=False)
     ip_address = Column(String(15), nullable=False)
+    udp_port = Column(Integer)
     channel_id = Column(Integer, ForeignKey('channel.id'), nullable=True)
     is_admin = Column(Boolean, default=False)
 

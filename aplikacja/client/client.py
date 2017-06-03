@@ -151,7 +151,6 @@ class Client:
                 #data = self.AUDIO.record()
                 data = b"HEEEEEEEEEEEEEEEEEJJJJJJ"
                 self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, int(server_udp_port)))
-                print("Wysłane:", data)
             except Exception as e:
                 print("UDP sending error:", e)
             time.sleep(2)
