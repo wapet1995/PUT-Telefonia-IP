@@ -12,7 +12,7 @@ class Server:
     def __init__(self):
         # technical parameters
         self.SIZE_OF_BUFFER = 1024  # max size of packets sending through socket
-        self.SERVER_IP = '192.168.0.12'
+        self.SERVER_IP = '192.168.137.69'
         self.SERVER_PORT = 50000
         self.SERVER_PORT_UDP = 60000
         self.MAX_USERS = 5
@@ -205,7 +205,8 @@ class Server:
             """
             chan = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
             tmp = [user_obj.ip_address, user_obj.udp_port]
-            self.USERS_IN_CHANNEL[chan.name].remove(tmp)
+            if tmp not in self.USERS_IN_CHANNEL[chan.name]:
+                self.USERS_IN_CHANNEL[chan.name].remove(tmp)
             user_obj.channel_id = None
             self.DATABASE.delete(user_obj)
             self.DATABASE.commit()

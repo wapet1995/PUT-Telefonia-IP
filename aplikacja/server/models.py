@@ -60,13 +60,13 @@ def database_connect():
     engine = create_engine('sqlite:///database.db?check_same_thread=False')
     connection = engine.connect()
     
-    '''
+    
     if engine.has_table("User"):
         User.__table__.drop(engine)
-        Channel.__table__.drop(engine)
-        Black_IP.__table__.drop(engine)
-        Black_Nick.__table__.drop(engine)
-    '''
+        #Channel.__table__.drop(engine)
+        #Black_IP.__table__.drop(engine)
+        #Black_Nick.__table__.drop(engine)
+    
 
     # create tables
     Base.metadata.create_all(engine)
