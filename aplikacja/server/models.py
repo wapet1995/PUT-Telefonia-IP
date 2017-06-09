@@ -26,13 +26,11 @@ class Channel(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
     password = Column(String(100), nullable=True)
-    description = Column(String(100), nullable=True)
     users = relationship('User', backref='channel')
 
-    def __init__(self, name, password, description):
+    def __init__(self, name, password):
         self.name = name
         self.password = password
-        self.description = description
 
 
 class Black_IP(Base):
@@ -60,13 +58,15 @@ def database_connect():
     engine = create_engine('sqlite:///database.db?check_same_thread=False')
     connection = engine.connect()
     
-    '''
+    
     if engine.has_table("User"):
         User.__table__.drop(engine)
+        '''
         Channel.__table__.drop(engine)
         Black_IP.__table__.drop(engine)
         Black_Nick.__table__.drop(engine)
-    '''
+        '''
+    
 
     # create tables
     Base.metadata.create_all(engine)

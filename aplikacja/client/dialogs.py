@@ -115,3 +115,139 @@ class AddChannelDialog(QDialog):
 
     def clickCancel(self):
         self.reject()
+
+
+class BlockNickDialog(QDialog):
+    def __init__(self, parent = None):
+        super(BlockNickDialog, self).__init__(parent)
+        #self.resize(650, 400)
+        #self.move(300, 250)
+        self.setWindowTitle("Block nickname")
+        layout = QGridLayout(self)
+        
+        # IP address
+        _lab1 = QLabel("Type nickname: ")
+        self.nickname = QLineEdit()
+
+        # port
+        _lab2 = QLabel("Cause: ")
+        self.cause = QLineEdit()
+
+
+        layout.addWidget(_lab1,0,0)
+        layout.addWidget(self.nickname,0,1)
+        layout.addWidget(_lab2,1,0)
+        layout.addWidget(self.cause,1,1)
+
+        # OK
+        add = QPushButton("Block")
+        layout.addWidget(add, 3,1)
+        add.clicked.connect(self.clickOk)
+        # Anuluj
+        cancel = QPushButton("Cancel")
+        layout.addWidget(cancel, 3,0)
+        cancel.clicked.connect(self.clickCancel)
+
+    def clickOk(self):
+        if self.nickname.text() == '':
+            return
+        self.accept()
+
+    def clickCancel(self):
+        self.reject()
+
+
+class BlockIPDialog(QDialog):
+    def __init__(self, parent = None):
+        super(BlockIPDialog, self).__init__(parent)
+        #self.resize(650, 400)
+        #self.move(300, 250)
+        self.setWindowTitle("Block IP")
+        layout = QGridLayout(self)
+        
+        # IP address
+        _lab1 = QLabel("Type IP: ")
+        self.ip = QLineEdit()
+
+        # port
+        _lab2 = QLabel("Cause: ")
+        self.cause = QLineEdit()
+
+
+        layout.addWidget(_lab1,0,0)
+        layout.addWidget(self.ip,0,1)
+        layout.addWidget(_lab2,1,0)
+        layout.addWidget(self.cause,1,1)
+
+        # OK
+        add = QPushButton("Block")
+        layout.addWidget(add, 3,1)
+        add.clicked.connect(self.clickOk)
+        # Anuluj
+        cancel = QPushButton("Cancel")
+        layout.addWidget(cancel, 3,0)
+        cancel.clicked.connect(self.clickCancel)
+
+    def validateIPv4(self, addr):
+        addr = addr.split(".")
+        if len(addr) == 4:
+            try:
+                if 0 <= int(addr[0]) < 255 and \
+                                        0 <= int(addr[1]) < 255 and \
+                                        0 <= int(addr[2]) < 255 and \
+                                        0 <= int(addr[3]) < 255:
+                    return True
+            except:
+                return False
+        return False
+
+    def clickOk(self):
+        if self.validateIPv4(self.ip.text()) and not self.ip == "":
+            self.accept()
+
+    def clickCancel(self):
+        self.reject()
+
+class UnBlockIPDialog(QDialog):
+    def __init__(self, parent = None):
+        super(UnBlockIPDialog, self).__init__(parent)
+        #self.resize(650, 400)
+        #self.move(300, 250)
+        self.setWindowTitle("Unblock IP")
+        layout = QGridLayout(self)
+        
+        # IP address
+        _lab1 = QLabel("Type IP: ")
+        self.ip = QLineEdit()
+
+        layout.addWidget(_lab1,0,0)
+        layout.addWidget(self.ip,0,1)
+
+        # OK
+        add = QPushButton("Ok")
+        layout.addWidget(add, 2,1)
+        add.clicked.connect(self.clickOk)
+        # Anuluj
+        cancel = QPushButton("Cancel")
+        layout.addWidget(cancel, 2,0)
+        cancel.clicked.connect(self.clickCancel)
+
+    def validateIPv4(self, addr):
+        addr = addr.split(".")
+        if len(addr) == 4:
+            try:
+                if 0 <= int(addr[0]) < 255 and \
+                                        0 <= int(addr[1]) < 255 and \
+                                        0 <= int(addr[2]) < 255 and \
+                                        0 <= int(addr[3]) < 255:
+                    return True
+            except:
+                return False
+        return False
+
+    def clickOk(self):
+        if self.validateIPv4(self.ip.text()) and not self.ip == "":
+            self.accept()
+
+    def clickCancel(self):
+        self.reject()

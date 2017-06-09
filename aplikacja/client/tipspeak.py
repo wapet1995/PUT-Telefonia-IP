@@ -349,42 +349,76 @@ class GUI(QMainWindow):
             self.refreshChannelsTree()
 
     def blockNick(self):
-        nick, result = QInputDialog.getText(self, 'Block nickname', 'Type nickname:')
-        if result:
-            if self.CONNECTION.blockNick(nick):
-                print("Zablokowano nick ", nick)
+        tmp = dialogs.BlockNickDialog(self)
+        if tmp.exec_():
+            if self.CONNECTION.blockNick(tmp.nickname.text(), tmp.cause.text()):
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Information)
+                msg.setWindowTitle(u":)")
+                msg.setText(u"Zablokowano " + tmp.nickname.text())
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
             else:
-                print("Złe hasło")
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Warning)
+                msg.setWindowTitle(u":(")
+                msg.setText(u"Nie udało się zablokować " + tmp.nickname.text())
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
 
     def unblockNick(self):
         nick, result = QInputDialog.getText(self, 'Unblock nickname', 'Type nickname:')
         if result:
             if self.CONNECTION.unblockNick(nick):
-                print("Odblokowano nick ", nick)
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Information)
+                msg.setWindowTitle(u":)")
+                msg.setText(u"Odblokowano " + nick)
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
             else:
-                print("Złe hasło")
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Warning)
+                msg.setWindowTitle(u":(")
+                msg.setText(u"Nie udało się odblokować " + nick)
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
 
     def blockIPAddress(self):
-        ip_address, result = QInputDialog.getText(self, 'Block IP address', 'Type IP address:')
-        if result:
-            if self.validateIPv4(ip_address):
-                if self.CONNECTION.blockIP(ip_address):
-                    print("Zablokowano adres IP ", ip_address)
-                else:
-                    print("Złe hasło")
+        tmp = dialogs.BlockIPDialog(self)
+        if tmp.exec_():
+            if self.CONNECTION.blockIP(tmp.ip.text(), tmp.cause.text()):
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Information)
+                msg.setWindowTitle(u":)")
+                msg.setText(u"Zablokowano " + tmp.ip.text())
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
             else:
-                print("Błędny adres IPv4")
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Warning)
+                msg.setWindowTitle(u":(")
+                msg.setText(u"Nie udało się zablokować " + tmp.ip.text())
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
 
     def unblockIPAddress(self):
-        ip_address, result = QInputDialog.getText(self, 'Unblock IP address', 'Type IP address:')
-        if result:
-            if self.validateIPv4(ip_address):
-                if self.CONNECTION.unblockIP(ip_address):
-                    print("Odblokowano adres IP ", ip_address)
-                else:
-                    print("Złe hasło")
+        tmp = dialogs.UnBlockIPDialog(self)
+        if tmp.exec_():
+            if self.CONNECTION.unblockIP(tmp.ip.text()):
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Information)
+                msg.setWindowTitle(u":)")
+                msg.setText(u"Odblokowano " + tmp.ip.text())
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
             else:
-                print("Błędny adres IPv4")
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Warning)
+                msg.setWindowTitle(u":(")
+                msg.setText(u"Nie udało się odblokować " + tmp.ip.text())
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
 
     # ----------------------    HELP - EVENTS     -------------------------------
 

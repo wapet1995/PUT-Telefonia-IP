@@ -205,7 +205,8 @@ class Server:
             """
             chan = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
             tmp = [user_obj.ip_address, user_obj.udp_port]
-            self.USERS_IN_CHANNEL[chan.name].remove(tmp)
+            if chan is not None:
+                self.USERS_IN_CHANNEL[chan.name].remove(tmp)
             user_obj.channel_id = None
             self.DATABASE.delete(user_obj)
             self.DATABASE.commit()
@@ -224,7 +225,7 @@ class Server:
             if self.DATABASE.query(models.Channel).filter_by(name=params_list[1]).first() is not None:
                 return "ERROR channel exists"
 
-            chan = models.Channel(params_list[1], params_list[2], "")
+            chan = models.Channel(params_list[1], params_list[2])
             self.DATABASE.add(chan)
             self.DATABASE.commit()
             self.set_BIG_LIST()
@@ -247,11 +248,11 @@ class Server:
             """
             Request for block IP address
             """
-            if len(params_list)<1:
+            if len(params_list)<2:
                 print(len(params_list))
                 return "ERROR not enough parameters"
 
-            ban = models.Black_IP(params_list[1], "")
+            ban = models.Black_IP(params_list[1], ' '.join(params_list[2:]))
             self.DATABASE.add(ban)
             self.DATABASE.commit()
             return "ACK_ADMIN"
@@ -274,10 +275,10 @@ class Server:
             """
             Request for block nickname
             """
-            if len(params_list)<1:
+            if len(params_list)<2:
                 return "ERROR not enough parameters"
 
-            ban = models.Black_Nick(params_list[1], "")
+            ban = models.Black_Nick(params_list[1], ' '.join(params_list[2:]))
             self.DATABASE.add(ban)
             self.DATABASE.commit()
             return "ACK_ADMIN"

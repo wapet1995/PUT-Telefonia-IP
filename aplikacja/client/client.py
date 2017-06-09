@@ -116,7 +116,7 @@ class Client:
             server_udp_port = response[1]
             # !!!
             
-            #self.AUDIO = Audio()
+            self.AUDIO = Audio()
             self.AUDIO_LOCK = True
             t_record = threading.Thread(target=self.record_and_send, args = (server_udp_port,))
             t_player = threading.Thread(target=self.receive_and_play, args = ())
@@ -242,8 +242,8 @@ class Client:
         else:
             print(' '.join(response))
 
-    def blockIP(self, ip_address):
-        self.CONNECTION.send(b"BLOCK_IP " + b" " + ip_address.encode('utf-8'))
+    def blockIP(self, ip_address, cause):
+        self.CONNECTION.send(b"BLOCK_IP " + b" " + ip_address.encode('utf-8') + b" " + cause.encode('utf-8'))
         response = self.receiveSafe()
         if response[0] == "ACK_ADMIN":
             print("-- IP blocked")
@@ -262,8 +262,8 @@ class Client:
             print(' '.join(response))
             return False
 
-    def blockNick(self, nick):
-        self.CONNECTION.send(b"BLOCK_NICK " + b" " + nick.encode('utf-8'))
+    def blockNick(self, nick, cause):
+        self.CONNECTION.send(b"BLOCK_NICK " + b" " + nick.encode('utf-8') + b" " + cause.encode('utf-8'))
         response = self.receiveSafe()
         if response[0] == "ACK_ADMIN":
             print("-- Nick blocked")
