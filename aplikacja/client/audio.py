@@ -4,38 +4,28 @@ import pyaudio
 
 class Audio:
 	def __init__(self):
-		self.CHUNK = 1024
+		self.CHUNK = 512
 		self.FORMAT = pyaudio.paInt16
 		self.CHANNELS = 1
-		self.RATE = 10240
+		self.RATE = 44100
 
-		# recording voice
-		self.p_speak = pyaudio.PyAudio()
-		self.SPEAK = self.p_speak.open(format = self.FORMAT,
+		self.p = pyaudio.PyAudio()
+		self.stream = self.p.open(format = self.FORMAT,
 							channels = self.CHANNELS,
 							rate = self.RATE,
 							input = True,
+							output=True,
 							frames_per_buffer = self.CHUNK)
-		
-		# playing voice
-		self.p_listen = pyaudio.PyAudio()
-		self.LISTEN = self.p_listen.open(format = self.FORMAT,
-							channels = self.CHANNELS,
-							rate = self.RATE,
-							output = True,
-							frames_per_buffer = self.CHUNK)
+		#self.stream.start_stream()
 
 
 	def record(self):
-		data = self.SPEAK.read(self.CHUNK)
-		return data
+		return self.stream.read(self.CHUNK)
 
 	def play(self, data):
-		self.LISTEN.write(data)
+		self.stream.write(data)
 
 	def exit(self):
-		self.SPEAK.close()
-		self.LISTEN.close()
-		self.p_speak.terminate()
-		self.p_listen.terminate()
+		self.stream.close()
+		self.p.terminate()
 

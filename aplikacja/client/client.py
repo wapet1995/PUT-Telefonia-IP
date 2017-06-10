@@ -7,6 +7,7 @@ import threading
 from audio import Audio
 import time
 from queue import Queue
+import base64
 
 class Client:
     def __init__(self, nick, server_ip_address, server_port):
@@ -153,19 +154,19 @@ class Client:
                 self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, int(server_udp_port)))
             except Exception as e:
                 print("UDP sending error:", e)
-            time.sleep(2)
         if self.AUDIO is not None:  # close audio stream
             self.AUDIO.exit()
 
     def receive_and_play(self):
         print("Odbieranie audio")
+        silence = chr(0)*self.AUDIO.CHUNK*self.AUDIO.CHANNELS*2
         while self.AUDIO_LOCK:
             try:
-                self.UDP_CONNECTION.settimeout(3)
-                data, _ = self.UDP_CONNECTION.recvfrom(self.SIZE_OF_BUFFER)
+                self.UDP_CONNECTION.settimeout(1)
+                data, _ = self.UDP_CONNECTION.recvfrom(self.AUDIO.CHUNK*2)
                 self.UDP_CONNECTION.settimeout(None)
-                #self.AUDIO.play(data)
-                print("Odebrane:", data.decode('utf-8'))
+                if data:
+                    self.AUDIO.play(data)
             except socket.timeout:
                 continue
             except:

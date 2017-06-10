@@ -6,6 +6,7 @@ import models
 import sha3
 from queue import Queue, Empty
 import traceback
+import base64
 
 
 class Server:
@@ -107,8 +108,8 @@ class Server:
         sock.settimeout(1)
         while self.GLOBAL_THREAD_LOCK:
             try:
-                data, addr = sock.recvfrom(1024)
-                print(addr, "odebrano", data.decode('utf-8'))
+                data, addr = sock.recvfrom(1024) # CHUNK
+                #print(addr, "odebrano", data.decode('utf-8'))
             except socket.timeout:
                 continue
             packet = [addr[0], data]
@@ -124,7 +125,7 @@ class Server:
             for usr in self.USERS_IN_CHANNEL[channel]:
                 if usr[0] != ip:
                     sock.sendto(data, (usr[0],usr[1]))
-                    print("wyslano", data.decode('utf-8'), "do", usr)
+                    #print("wyslano", data.decode('utf-8'), "do", usr)
 
     #  ----------------------------------------------------------------------
 
