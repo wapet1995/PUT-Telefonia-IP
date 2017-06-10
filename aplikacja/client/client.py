@@ -4,7 +4,7 @@ import socket
 import sys
 import sha3
 import threading
-from audio import Audio
+import pyaudio
 import time
 from queue import Queue
 import base64
@@ -114,15 +114,17 @@ class Client:
 
         if response[0] == "JOINED":
             self.CURRENT_CHANNEL = channel_name
-            server_udp_port = response[1]
+            self.server_udp_port = response[1]
             # !!!
             
-            self.AUDIO = Audio()
+            #self.AUDIO = Audio()
             self.AUDIO_LOCK = True
-            t_record = threading.Thread(target=self.record_and_send, args = (server_udp_port,))
-            t_player = threading.Thread(target=self.receive_and_play, args = ())
-            t_record.start()
-            t_player.start()
+            t_udp_controller = threading.Thread(target=self.udp_controller)
+            t_udp_controller.start()
+            #t_record = threading.Thread(target=self.record_and_send, args = (server_udp_port,))
+            #t_player = threading.Thread(target=self.receive_and_play, args = ())
+            #t_record.start()
+            #t_player.start()
             
             # !!!
             return True
@@ -134,6 +136,75 @@ class Client:
             return False
 
     # ------------------------   UDP AUDIO   --------------------------------------
+
+    def udp_controller(self):
+        inp = self.init_audio_input()
+        out = self.init_audio_output()
+
+        inp.start_stream()
+        out.start_stream()
+        while self.AUDIO_LOCK and inp.is_active() and out.is_active():
+            time.sleep(0.1)
+        inp.stop_stream()
+        inp.close()
+        out.stop_stream()
+        out.close()
+
+    def init_audio_input(self):
+        def callback(in_data, frame_count, time_info, status):
+            try:
+                self.UDP_CONNECTION.sendto(in_data, (self.SERVER_IP_ADDRESS, int(self.server_udp_port)))
+            except Exception as e:
+                print("UDP sending error:", e)
+                return (in_data, pyaudio.paComplete)
+            return (in_data, pyaudio.paContinue)
+
+        CHUNK = 512
+        FORMAT = pyaudio.paInt16
+        CHANNELS = 1
+        RATE = 44100
+
+        p = pyaudio.PyAudio()
+        stream = p.open(format = FORMAT,
+                            channels = CHANNELS,
+                            rate = RATE,
+                            input = True,
+                            frames_per_buffer = CHUNK,
+                            stream_callback=callback)
+        return stream
+
+    def init_audio_output(self):
+        def callback(in_data, frame_count, time_info, status):
+            while True:
+                try:
+                    self.UDP_CONNECTION.settimeout(1)
+                    in_data, _ = self.UDP_CONNECTION.recvfrom(CHUNK*2)
+                    self.UDP_CONNECTION.settimeout(None)
+                    break
+                except socket.timeout as e:
+                    print("Odtwarzanie błąd 1:", e)
+                    continue
+                except socket.error as e:
+                    print("Odtwarzanie błąd 2:", e)
+                    return (in_data, pyaudio.paComplete)
+            return (in_data, pyaudio.paContinue)
+
+        CHUNK = 512
+        FORMAT = pyaudio.paInt16
+        CHANNELS = 1
+        RATE = 44100
+
+        p = pyaudio.PyAudio()
+        stream = p.open(format = FORMAT,
+                            channels = CHANNELS,
+                            rate = RATE,
+                            output = True,
+                            frames_per_buffer = CHUNK,
+                            stream_callback=callback)
+        return stream
+
+
+
 
     def init_UDP_connection(self):
         tmp = 55555
