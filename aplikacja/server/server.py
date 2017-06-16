@@ -47,7 +47,7 @@ class Server:
 
     def setAdminPassword(self, password):
         s = sha3.sha3_512()
-        s.update(password)
+        s.update(password.encode('utf-8'))
         self.ADMIN_PASSWORD = s.hexdigest().decode('utf-8')
 
     def checkAdminPassword(self, password):
