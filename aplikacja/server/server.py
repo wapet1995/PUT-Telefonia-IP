@@ -13,7 +13,7 @@ class Server:
     def __init__(self):
         # technical parameters
         self.SIZE_OF_BUFFER = 1024  # max size of packets sending through socket
-        self.SERVER_IP = '192.168.0.12'
+        self.SERVER_IP = '127.0.0.1'
         self.SERVER_PORT = 50000
         self.SERVER_PORT_UDP = 60000
         self.MAX_USERS = 5
@@ -47,8 +47,9 @@ class Server:
 
     def setAdminPassword(self, password):
         s = sha3.sha3_512()
+        password = password.encode('utf-8')
         s.update(password)
-        self.ADMIN_PASSWORD = s.hexdigest().decode('utf-8')
+        self.ADMIN_PASSWORD = s.hexdigest()
 
     def checkAdminPassword(self, password):
         if self.ADMIN_PASSWORD == password:

@@ -34,8 +34,9 @@ class Client:
 
     def hashAdminPassword(self, password):
         s = sha3.sha3_512()
+        password = password.encode('utf-8')
         s.update(password)
-        return s.hexdigest().decode('utf-8')
+        return s.hexdigest()
 
     def receiveSafe(self):
         """
