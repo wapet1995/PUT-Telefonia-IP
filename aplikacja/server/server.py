@@ -47,14 +47,9 @@ class Server:
 
     def setAdminPassword(self, password):
         s = sha3.sha3_512()
-<<<<<<< HEAD
         password = password.encode('utf-8')
         s.update(password)
         self.ADMIN_PASSWORD = s.hexdigest()
-=======
-        s.update(password.encode('utf-8'))
-        self.ADMIN_PASSWORD = s.hexdigest().decode('utf-8')
->>>>>>> origin/master
 
     def checkAdminPassword(self, password):
         if self.ADMIN_PASSWORD == password:

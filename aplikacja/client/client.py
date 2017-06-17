@@ -117,16 +117,9 @@ class Client:
             self.CURRENT_CHANNEL = channel_name
             self.server_udp_port = response[1]
             # !!!
-            
-            #self.AUDIO = Audio()
             self.AUDIO_LOCK = True
             t_udp_controller = threading.Thread(target=self.udp_controller)
             t_udp_controller.start()
-            #t_record = threading.Thread(target=self.record_and_send, args = (server_udp_port,))
-            #t_player = threading.Thread(target=self.receive_and_play, args = ())
-            #t_record.start()
-            #t_player.start()
-            
             # !!!
             return True
         elif response[0] == "NOT_JOINED":
@@ -215,36 +208,6 @@ class Client:
         except Exception as e:
             print("UDP init error:", str(e))
         self.UDP_MY_PORT = tmp
-
-
-    def record_and_send(self, server_udp_port): # record and send voice
-        print("Wysylanie audio")
-        while self.AUDIO_LOCK:
-            try:
-                #data = self.AUDIO.record()
-                data = b"HEEEEEEEEEEEEEEEEEJJJJJJ"
-                self.UDP_CONNECTION.sendto(data, (self.SERVER_IP_ADDRESS, int(server_udp_port)))
-            except Exception as e:
-                print("UDP sending error:", e)
-        if self.AUDIO is not None:  # close audio stream
-            self.AUDIO.exit()
-
-    def receive_and_play(self):
-        print("Odbieranie audio")
-        silence = chr(0)*self.AUDIO.CHUNK*self.AUDIO.CHANNELS*2
-        while self.AUDIO_LOCK:
-            try:
-                self.UDP_CONNECTION.settimeout(1)
-                data, _ = self.UDP_CONNECTION.recvfrom(self.AUDIO.CHUNK*2)
-                self.UDP_CONNECTION.settimeout(None)
-                if data:
-                    self.AUDIO.play(data)
-            except socket.timeout:
-                continue
-            except:
-                pass
-        if self.AUDIO is not None:  # close audio stream
-            self.AUDIO.exit()
 
     # -----------------------------------------------------------------------------
 
