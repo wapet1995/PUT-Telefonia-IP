@@ -13,7 +13,7 @@ class Server:
     def __init__(self):
         # technical parameters
         self.SIZE_OF_BUFFER = 1024  # max size of packets sending through socket
-        self.SERVER_IP = '127.0.0.1'
+        self.SERVER_IP = '192.168.0.12'
         self.SERVER_PORT = 50000
         self.SERVER_PORT_UDP = 60000
         self.MAX_USERS = 5
@@ -34,12 +34,16 @@ class Server:
         """
         self.USERS_IN_CHANNEL = {
                     "kanal1": [
-                                ["192.168.0.12", 67890],
-                                ["192.168.0.11", 12345]
+                                ["192.168.0.12", 67890, mietek],
+                                ["192.168.0.11", 12345, franek]
                             ]
                     }
         """
         self.USERS_IN_CHANNEL = {}
+        self.USERS_SOCKETS = {}
+        """
+        self.USERS_SOCKETS = {"krzysiek": tcp_socket, "admin": tcp_socket}
+        """
         self.UDP_PORT_NUMBERS = 60001
 
 
@@ -49,13 +53,39 @@ class Server:
         s = sha3.sha3_512()
         password = password.encode('utf-8')
         s.update(password)
-        self.ADMIN_PASSWORD = s.hexdigest()
+        self.ADMIN_PASSWORD = s.hexdigest().decode('utf-8')
 
     def checkAdminPassword(self, password):
         if self.ADMIN_PASSWORD == password:
             return True
         else:
             return False
+
+    def deleteIPfrom_UIC(self, ip):
+        """
+        Delete User with specific IP from USERS_IN_CHANNEL
+        """
+        for i in self.USERS_IN_CHANNEL.items():
+            channel_name, tmp = i
+            for usr in tmp:
+                if usr[0] == ip:
+                    usr_sock = self.USERS_SOCKETS[usr[2]]
+                    usr_sock.close()
+                    print("usuwam scket", usr)
+                    self.USERS_IN_CHANNEL[channel_name].remove(usr)
+
+    def deleteNickfrom_UIC(self, nick):
+        """
+        Delete User with specific Nick from USERS_IN_CHANNEL
+        """
+        for i in self.USERS_IN_CHANNEL.items():
+            channel_name, tmp = i
+            for usr in tmp:
+                if usr[2] == nick:
+                    usr_sock = self.USERS_SOCKETS[usr[2]]
+                    usr_sock.close()
+                    self.USERS_IN_CHANNEL[channel_name].remove(usr)
+
 
     # ------------- BIG LIST ---- AND ---- USERS IN CHANNEL ----------------
 
@@ -163,7 +193,7 @@ class Server:
                 if user_obj.channel_id == channel.id:
                     return "ERROR you are in this channel" # user was and is in channel
                 else:
-                    tmp = [user_obj.ip_address, int(params_list[2])]
+                    tmp = [user_obj.ip_address, int(params_list[2]), user_obj.nick]
                     if old_channel is not None and tmp in self.USERS_IN_CHANNEL[old_channel.name]:
                         self.USERS_IN_CHANNEL[old_channel.name].remove(tmp)
                     
@@ -195,7 +225,10 @@ class Server:
             """
             chan = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
             tmp = [user_obj.ip_address, user_obj.udp_port]
-            self.USERS_IN_CHANNEL[chan.name].remove(tmp)
+            try:
+                self.USERS_IN_CHANNEL[chan.name].remove(tmp)
+            except:
+                    pass
             user_obj.channel_id = None
             self.DATABASE.commit()
             return "CHAN_EXITED"
@@ -208,7 +241,10 @@ class Server:
             chan = self.DATABASE.query(models.Channel).filter_by(id=user_obj.channel_id).first()
             tmp = [user_obj.ip_address, user_obj.udp_port]
             if chan is not None:
-                self.USERS_IN_CHANNEL[chan.name].remove(tmp)
+                try:
+                    self.USERS_IN_CHANNEL[chan.name].remove(tmp)
+                except:
+                    pass
             user_obj.channel_id = None
             self.DATABASE.delete(user_obj)
             self.DATABASE.commit()
@@ -257,6 +293,7 @@ class Server:
             ban = models.Black_IP(params_list[1], ' '.join(params_list[2:]))
             self.DATABASE.add(ban)
             self.DATABASE.commit()
+            self.deleteIPfrom_UIC(params_list[1])
             return "ACK_ADMIN"
 
         elif comm == "UNBLOCK_IP":
@@ -283,6 +320,7 @@ class Server:
             ban = models.Black_Nick(params_list[1], ' '.join(params_list[2:]))
             self.DATABASE.add(ban)
             self.DATABASE.commit()
+            self.deleteNickfrom_UIC(params_list[1])
             return "ACK_ADMIN"
 
         elif comm == "UNBLOCK_NICK":
@@ -344,12 +382,15 @@ class Server:
                 user_id = self.DATABASE.query(models.User).filter_by(nick=nick).first()
                 if user_id.is_admin:
                     print("--Admin login")
+                    self.USERS_SOCKETS[nick] = client
                     return "CONNECTED-a", user_id.id
                 else:
                     print("--Normal user login")
+                    self.USERS_SOCKETS[nick] = client
                     return "CONNECTED", user_id.id
-            except:
+            except Exception as e:
                 self.DATABASE.rollback()
+                print("Blad", e)
                 return "ERROR database integrity error", None
         else:
             print("-- Please login first")
@@ -380,7 +421,15 @@ class Server:
                     params_list = data.decode('utf-8').split(" ")[1:]
 
                     response = self.commands(comm, params_list, user_obj)
-                    client.send(response.encode('utf-8'))  # send response to client
+                    try:
+                        client.send(response.encode('utf-8'))  # send response to client
+                    except Exception as e:
+                        print("Wymuszenie rozlaczenia", e)
+                        client.close()
+                        self.DATABASE.delete(user_obj)
+                        self.DATABASE.commit()
+                        self.DATABASE.close()
+                        return
 
                     if response == "DISCONNECTED":
                         client.close()
@@ -399,7 +448,6 @@ class Server:
                 self.DATABASE.commit()
                 self.DATABASE.close()  # close database connection for this thread
                 print("\n-- Management_connection error: ", str(e))
-                traceback.print_exc()
                 return
 
 

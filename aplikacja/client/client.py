@@ -68,7 +68,7 @@ class Client:
         self.MY_IP_ADDRESS = str(s.getsockname()[0])
         admin_password = self.hashAdminPassword(admin_password)
         s.settimeout(10.0)
-        s.send(b"CONNECT " + self.MY_NICK.encode('utf-8') + b" " + admin_password.encode('utf-8'))
+        s.send(b"CONNECT " + self.MY_NICK.encode('utf-8') + b" " + admin_password)
         try:
             response = s.recv(self.SIZE_OF_BUFFER).decode('utf-8')
         except:
