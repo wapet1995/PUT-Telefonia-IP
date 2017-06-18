@@ -220,7 +220,7 @@ class GUI(QMainWindow):
 
     def refreshChannelsTree(self):
         if not self.CONNECTION.getChannelsList():
-            self.disconnectFromServer()
+            self.kickedFromServer()
             return
         self.channelsTree.clear()
 
@@ -268,7 +268,7 @@ class GUI(QMainWindow):
 
     def refreshUsersTree(self):
         if not self.CONNECTION.getChannelUsers(self.CONNECTION.CURRENT_CHANNEL):
-            self.disconnectFromServer()
+            self.kickedFromServer()
             return
         self.usersTree.clear()
 
@@ -305,10 +305,35 @@ class GUI(QMainWindow):
             self.timer_users.stop()
             self.timer_channels.stop()
             self.chosen_nick.setText("Users")
+            self.chosen_channel.setText("Channels")
             return True
         else:
             print("Błąd rozłączania. Spróbuj jeszcze raz.")
             return False
+
+    def kickedFromServer(self):
+        print("Rozłączam od serwera")
+        self.exitFromChannelAction.setEnabled(False)
+        self.connectAction.setEnabled(True)  # disable connection button in menu
+        self.disconnectAction.setEnabled(False)
+        self.CONNECTION = None
+        self.channelsTree.clear()
+        self.usersTree.clear()
+        self.conn_status.setText("Not connected to server")
+        self.conn_status.setStyleSheet("color: red;")
+        self.statusBar().showMessage('Disconnected')
+        self.timer_users.stop()
+        self.timer_channels.stop()
+        self.chosen_nick.setText("Users")
+        self.chosen_channel.setText("Channels")
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Critical)
+        msg.setWindowTitle(u":(")
+        msg.setText(u"Wyrzucono Cię z serwera")
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+        sys.exit(0)
+
 
 
     def quit(self):
