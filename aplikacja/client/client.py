@@ -94,7 +94,10 @@ class Client:
             return False
 
     def getChannelsList(self):
-        self.CONNECTION.send(b"ASK_CHANNELS")
+        try:
+            self.CONNECTION.send(b"ASK_CHANNELS")
+        except:
+            return False
         response = self.receiveSafe()
 
         if response[0] == "CHANNELS":
@@ -103,8 +106,7 @@ class Client:
             self.CHANNELS_LIST = []
             for i in channels:
                 self.CHANNELS_LIST.append(i)
-        else:
-            print(';'.join(response))
+        return True
 
     def joinChannel(self, channel_name, password):
         self.AUDIO_LOCK = False  # stop previous audio stream
@@ -213,7 +215,10 @@ class Client:
 
 
     def getChannelUsers(self, channel_name):
-        self.CONNECTION.send(b"ASK_CHAN_USERS " + channel_name.encode('utf-8'))
+        try:
+            self.CONNECTION.send(b"ASK_CHAN_USERS " + channel_name.encode('utf-8'))
+        except:
+            return False
         response = self.receiveSafe()
 
         if response[0] == "CHAN_USERS":
@@ -222,8 +227,7 @@ class Client:
             self.CURRENT_CHANNEL_USERS = []
             for i in users:
                 self.CURRENT_CHANNEL_USERS.append(i)
-        else:
-            print(' '.join(response))
+        return True
 
     def exitChannel(self):
         self.AUDIO_LOCK = False  # stop audio stream
@@ -241,7 +245,17 @@ class Client:
 
     def disconnect(self):
         self.AUDIO_LOCK = False  # stop audio stream
-        self.CONNECTION.send(b"DISCONNECT")
+        try:
+            self.CONNECTION.send(b"DISCONNECT")
+        except:
+            self.CURRENT_CHANNEL_USERS = []
+            self.CURRENT_CHANNEL = None
+            self.CHANNELS_LIST = []
+            self.CONNECTION.close()
+            if self.UDP_CONNECTION is not None:
+                self.UDP_CONNECTION.close()
+            return True
+            
         response = self.receiveSafe()
 
         if response[0] == "DISCONNECTED":
