@@ -219,7 +219,9 @@ class GUI(QMainWindow):
 
 
     def refreshChannelsTree(self):
-        self.CONNECTION.getChannelsList()
+        if not self.CONNECTION.getChannelsList():
+            self.disconnectFromServer()
+            return
         self.channelsTree.clear()
 
         if self.CONNECTION is None:
@@ -265,7 +267,9 @@ class GUI(QMainWindow):
 
 
     def refreshUsersTree(self):
-        self.CONNECTION.getChannelUsers(self.CONNECTION.CURRENT_CHANNEL)
+        if not self.CONNECTION.getChannelUsers(self.CONNECTION.CURRENT_CHANNEL):
+            self.disconnectFromServer()
+            return
         self.usersTree.clear()
 
         if self.CONNECTION is None:
