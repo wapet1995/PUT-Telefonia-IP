@@ -313,6 +313,7 @@ class GUI(QMainWindow):
 
     def kickedFromServer(self):
         print("Rozłączam od serwera")
+        self.CONNECTION.AUDIO_LOCK = False
         self.exitFromChannelAction.setEnabled(False)
         self.connectAction.setEnabled(True)  # disable connection button in menu
         self.disconnectAction.setEnabled(False)

@@ -16,7 +16,7 @@ class Server:
         self.SERVER_IP = '192.168.0.12'
         self.SERVER_PORT = 50000
         self.SERVER_PORT_UDP = 60000
-        self.MAX_USERS = 5
+        self.MAX_USERS = 20
         self.SERVER = None  # TCP socket
         self.GLOBAL_THREAD_LOCK = True
 
