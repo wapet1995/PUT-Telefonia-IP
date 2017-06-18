@@ -94,7 +94,17 @@ class Client:
             return False
 
     def getChannelsList(self):
-        self.CONNECTION.send(b"ASK_CHANNELS")
+        try:
+            self.CONNECTION.send(b"ASK_CHANNELS")
+        except:
+            print("-- You have kicked from server")
+            self.CURRENT_CHANNEL_USERS = []
+            self.CURRENT_CHANNEL = None
+            self.CHANNELS_LIST = []
+            self.CONNECTION.close()
+            if self.UDP_CONNECTION is not None:
+                self.UDP_CONNECTION.close()
+
         response = self.receiveSafe()
 
         if response[0] == "CHANNELS":
@@ -213,7 +223,17 @@ class Client:
 
 
     def getChannelUsers(self, channel_name):
-        self.CONNECTION.send(b"ASK_CHAN_USERS " + channel_name.encode('utf-8'))
+        try:
+            self.CONNECTION.send(b"ASK_CHAN_USERS " + channel_name.encode('utf-8'))
+        except:
+            print("-- You have kicked from server")
+            self.CURRENT_CHANNEL_USERS = []
+            self.CURRENT_CHANNEL = None
+            self.CHANNELS_LIST = []
+            self.CONNECTION.close()
+            if self.UDP_CONNECTION is not None:
+                self.UDP_CONNECTION.close()
+                
         response = self.receiveSafe()
 
         if response[0] == "CHAN_USERS":
