@@ -5,9 +5,7 @@ import threading
 import models
 import sha3
 from queue import Queue, Empty
-import traceback
 import base64
-
 
 class Server:
     def __init__(self):
@@ -71,7 +69,7 @@ class Server:
                 if usr[0] == ip:
                     usr_sock = self.USERS_SOCKETS[usr[2]]
                     usr_sock.close()
-                    print("usuwam scket", usr)
+                    #print("usuwam socket", usr)
                     self.USERS_IN_CHANNEL[channel_name].remove(usr)
 
     def deleteNickfrom_UIC(self, nick):
@@ -287,7 +285,7 @@ class Server:
             Request for block IP address
             """
             if len(params_list)<2:
-                print(len(params_list))
+                #print(len(params_list))
                 return "ERROR not enough parameters"
 
             ban = models.Black_IP(params_list[1], ' '.join(params_list[2:]))
@@ -301,7 +299,7 @@ class Server:
             Request for unblock IP address
             """
             if len(params_list)<1:
-                print(len(params_list))
+                #print(len(params_list))
                 return "ERROR not enough parameters"
 
             unban = self.DATABASE.query(models.Black_IP).filter_by(ip=params_list[1]).first()
@@ -337,7 +335,7 @@ class Server:
             return "ACK_ADMIN"
 
         else:
-            print("-- Unknow command:", comm)
+            #print("-- Unknow command:", comm)
             return "Unknow command: " + comm
 
     def login(self, client, ip):
@@ -349,7 +347,7 @@ class Server:
         try:
             data = client.recv(self.SIZE_OF_BUFFER)  # expected command: CONNECT name
         except Exception as e:
-            print("-- Timeout exceeded:", e)
+            #print("-- Timeout exceeded:", e)
             return "Timeout exceeded", None
         client.settimeout(None)
         comm = data.decode('utf-8').split(" ")[0]
@@ -390,10 +388,10 @@ class Server:
                     return "CONNECTED", user_id.id
             except Exception as e:
                 self.DATABASE.rollback()
-                print("Blad", e)
+                #print("Blad", e)
                 return "ERROR database integrity error", None
         else:
-            print("-- Please login first")
+            #print("-- Please login first")
             return "ERROR login first", None
 
 

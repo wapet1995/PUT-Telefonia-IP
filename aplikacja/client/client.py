@@ -72,7 +72,7 @@ class Client:
         try:
             response = s.recv(self.SIZE_OF_BUFFER).decode('utf-8')
         except:
-            print("-- Connection error")
+            #print("-- Connection error")
             return False
         s.settimeout(None)
 
@@ -87,10 +87,10 @@ class Client:
             return True
 
         elif response == "NOT_CONNECTED":
-            print("NOT_CONNECTED nick is busy or blocked")
+            #print("NOT_CONNECTED nick is busy or blocked")
             return False
         else:
-            print(response)
+            #print(response)
             return False
 
     def getChannelsList(self):
@@ -125,10 +125,10 @@ class Client:
             # !!!
             return True
         elif response[0] == "NOT_JOINED":
-            print("-- Invalid password")
+            #print("-- Invalid password")
             return False
         else:
-            print(' '.join(response))
+            #print(' '.join(response))
             return False
 
     # ------------------------   UDP AUDIO   --------------------------------------
@@ -151,7 +151,7 @@ class Client:
             try:
                 self.UDP_CONNECTION.sendto(in_data, (self.SERVER_IP_ADDRESS, int(self.server_udp_port)))
             except Exception as e:
-                print("UDP sending error:", e)
+                #print("UDP sending error:", e)
                 return (in_data, pyaudio.paComplete)
             return (in_data, pyaudio.paContinue)
 
@@ -178,11 +178,8 @@ class Client:
                     self.UDP_CONNECTION.settimeout(None)
                     break
                 except socket.timeout as e:
-                    print("Odtwarzanie błąd 1:", e)
+                    #print("Odtwarzanie błąd 1:", e)
                     continue
-                except socket.error as e:
-                    print("Odtwarzanie błąd 2:", e)
-                    return (in_data, pyaudio.paComplete)
             return (in_data, pyaudio.paContinue)
 
         CHUNK = 512
@@ -208,7 +205,7 @@ class Client:
         try:
             self.UDP_CONNECTION.bind((self.MY_IP_ADDRESS,tmp))
         except Exception as e:
-            print("UDP init error:", str(e))
+            #print("UDP init error:", str(e))
         self.UDP_MY_PORT = tmp
 
     # -----------------------------------------------------------------------------
@@ -235,12 +232,12 @@ class Client:
         response = self.receiveSafe()
 
         if response[0] == "CHAN_EXITED":
-            print("-- You left channel")
+            #print("-- You left channel")
             self.CURRENT_CHANNEL_USERS = []
             self.CURRENT_CHANNEL = None
             return True
         else:
-            print(' '.join(response))
+            #print(' '.join(response))
             return False
 
     def disconnect(self):
@@ -259,7 +256,7 @@ class Client:
         response = self.receiveSafe()
 
         if response[0] == "DISCONNECTED":
-            print("-- You left server")
+            #print("-- You left server")
             self.CURRENT_CHANNEL_USERS = []
             self.CURRENT_CHANNEL = None
             self.CHANNELS_LIST = []
@@ -268,7 +265,7 @@ class Client:
                 self.UDP_CONNECTION.close()
             return True
         else:
-            print(' '.join(response))
+            #print(' '.join(response))
             return False
 
 
@@ -280,60 +277,63 @@ class Client:
 
         response = self.receiveSafe()
         if response[0] == "ACK_ADMIN":
-            print("-- Channel added to list")
+            #print("-- Channel added to list")
+            return True
         else:
-            print(' '.join(response))
+            #print(' '.join(response))
+            return False
 
     def delChannel(self, channel_name):
         self.CONNECTION.send(b"DEL_CHANNEL " + b" " + channel_name.encode('utf-8'))
         response = self.receiveSafe()
         if response[0] == "ACK_ADMIN":
-            print("-- Channel deleted")
+            #print("-- Channel deleted")
+            return True
         else:
             print(' '.join(response))
+            return False
 
     def blockIP(self, ip_address, cause):
         self.CONNECTION.send(b"BLOCK_IP " + b" " + ip_address.encode('utf-8') + b" " + cause.encode('utf-8'))
         response = self.receiveSafe()
         if response[0] == "ACK_ADMIN":
-            print("-- IP blocked")
+            #print("-- IP blocked")
             return True
         else:
-            print(' '.join(response))
+            #print(' '.join(response))
             return False
 
     def unblockIP(self, ip_address):
         self.CONNECTION.send(b"UNBLOCK_IP " + b" " + ip_address.encode('utf-8'))
         response = self.receiveSafe()
         if response[0] == "ACK_ADMIN":
-            print("-- IP unblocked")
+            #print("-- IP unblocked")
             return True
         else:
-            print(' '.join(response))
+            #print(' '.join(response))
             return False
 
     def blockNick(self, nick, cause):
         self.CONNECTION.send(b"BLOCK_NICK " + b" " + nick.encode('utf-8') + b" " + cause.encode('utf-8'))
         response = self.receiveSafe()
         if response[0] == "ACK_ADMIN":
-            print("-- Nick blocked")
+            #print("-- Nick blocked")
             return True
         else:
-            print(' '.join(response))
+            #print(' '.join(response))
             return False
 
     def unblockNick(self, nick):
         self.CONNECTION.send(b"UNBLOCK_NICK " + b" " + nick.encode('utf-8'))
         response = self.receiveSafe()
         if response[0] == "ACK_ADMIN":
-            print("-- Nick unblocked")
+            #print("-- Nick unblocked")
             return True
         else:
-            print(' '.join(response))
+            #print(' '.join(response))
             return False
 
 
 
 if __name__ == "__main__": 
-    k = Client("krzysiek", "127.0.0.1", "127.0.0.1", 50000) 
-    k.test()
+    pass

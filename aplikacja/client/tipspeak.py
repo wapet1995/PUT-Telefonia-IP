@@ -5,9 +5,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 import socket
 from client import Client
-
 import dialogs
-
 
 class GUI(QMainWindow):
     def __init__(self):
@@ -145,8 +143,6 @@ class GUI(QMainWindow):
         self.usersTree.setStyleSheet("background: #D6D6D6; font-size: 18px; border: none; color: green;")
         self.usersTree.setHeaderHidden(True)
         self.usersTree.setContextMenuPolicy(Qt.CustomContextMenu)
-        #self.usersTree.customContextMenuRequested.connect(self.userTreeContextMenu)
-
 
         usersGroupLayout.addWidget(self.usersTree)
         self.usersGroupFrame.setLayout(usersGroupLayout)
@@ -193,7 +189,7 @@ class GUI(QMainWindow):
         # connect to server with given IP address, port and unique nick
         conn = dialogs.ConnectDialog(self)
         if conn.exec_():
-            print("Łącze z serwerem")
+            #print("Łącze z serwerem")
             server_ip = str(conn.ip_address.text())
             server_port = conn.port_number.value()
             nick = str(conn.nick.text())
@@ -214,7 +210,18 @@ class GUI(QMainWindow):
                 self.chosen_nick.setText("Nick: " + nick)
             else:
                 self.CONNECTION = None
-                print("Nie połączono - nick jest zajęty lub zablokowany")
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Warning)
+                msg.setWindowTitle(u":(")
+                msg.setText(u"""Nie można podłączyć się do serwera\n
+                    Możliwe przyczyny:
+                    - adres IP jest zablokowany
+                    - nick jest zajęty lub zablokowany
+                    - niepoprawny adres IP serwera
+                    """)
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
+                #print("Nie połączono - nick jest zajęty lub zablokowany")
                 self.statusBar().showMessage('Not connected')
 
 
@@ -244,19 +251,31 @@ class GUI(QMainWindow):
             if self.CONNECTION.exitChannel():
                 password, result = QInputDialog.getText(self, 'Password for channel', 'Enter password:')
                 if result and self.CONNECTION.joinChannel(item.text(column), password):
-                    print("Wszedłeś do kanału")
+                    #print("Wszedłeś do kanału")
                     self.chosen_channel.setText("Channel: " + self.CONNECTION.CURRENT_CHANNEL)
+                else:
+                    msg = QMessageBox(self)
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.setWindowTitle(u":(")
+                    msg.setText(u"Błędne hasło")
+                    msg.setStandardButtons(QMessageBox.Ok)
+                    msg.exec_()
             else:
-                print("Błąd podczas wchodzenia do kanału. (1)")
+                #print("Błąd podczas wychodzenia z kanału. (1)")
                 self.timer_channels.start()
                 return
         else:
             password, result = QInputDialog.getText(self, 'Password for channel', 'Enter password:')
             if result and self.CONNECTION.joinChannel(item.text(column), password):
-                print("Wszedłeś do kanału")
+                #print("Wszedłeś do kanału")
                 self.chosen_channel.setText("Channel: " + self.CONNECTION.CURRENT_CHANNEL)
             else:
-                print("Błąd podczas wchodzenia do kanału. (2)")
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Critical)
+                msg.setWindowTitle(u":(")
+                msg.setText(u"Błędne hasło")
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
                 self.timer_channels.start()
                 return
         
@@ -273,7 +292,8 @@ class GUI(QMainWindow):
         self.usersTree.clear()
 
         if self.CONNECTION is None:
-            print("Błąd połączenia podczas odświeżania listy użytkowników")
+            pass
+            #print("Błąd połączenia podczas odświeżania listy użytkowników")
 
         for i in self.CONNECTION.CURRENT_CHANNEL_USERS:
             tmp = QTreeWidgetItem()
@@ -281,7 +301,7 @@ class GUI(QMainWindow):
             self.usersTree.addTopLevelItem(tmp)
 
     def exitFromChannel(self):
-        print("Wyjście z kanału")
+        #print("Wyjście z kanału")
         self.CONNECTION.exitChannel()
         self.timer_users.stop()
         self.usersTree.clear()
@@ -290,10 +310,10 @@ class GUI(QMainWindow):
 
 
     def disconnectFromServer(self):
-        print("Rozłączam od serwera")
+        #print("Rozłączam od serwera")
         self.exitFromChannelAction.setEnabled(False)
         if self.CONNECTION.disconnect():
-            print("Rozłączono")
+            #print("Rozłączono")
             self.connectAction.setEnabled(True)  # disable connection button in menu
             self.disconnectAction.setEnabled(False)
             self.CONNECTION = None
@@ -308,11 +328,11 @@ class GUI(QMainWindow):
             self.chosen_channel.setText("Channels")
             return True
         else:
-            print("Błąd rozłączania. Spróbuj jeszcze raz.")
+            #print("Błąd rozłączania. Spróbuj jeszcze raz.")
             return False
 
     def kickedFromServer(self):
-        print("Rozłączam od serwera")
+        #print("Rozłączam od serwera")
         self.CONNECTION.AUDIO_LOCK = False
         self.exitFromChannelAction.setEnabled(False)
         self.connectAction.setEnabled(True)  # disable connection button in menu
@@ -345,22 +365,6 @@ class GUI(QMainWindow):
         else:
             print("Spróbuj wyjść jeszcze raz")
 
-    
-    @pyqtSlot(QPoint)
-    def userTreeContextMenu(self, position):
-        # for context menu - right click on user in users tree
-        # if usersTree has values
-        if self.usersTree.topLevelItemCount() > 0:
-            self.listMenu = QMenu()
-            menu_item = self.listMenu.addAction("print nick")
-            menu_item.triggered.connect(self.userTreeMenu)
-            parent_position = self.usersTree.mapToGlobal(QPoint(0, 0))
-            self.listMenu.move(parent_position + position)
-            self.listMenu.show()
-
-    def userTreeMenu(self):
-        print(self.usersTree.currentItem().text(0))  # ??? jeszcze nie wiem czemu dziala z zerem
-
 
     # ---------------------------     Administration - EVENTS     -------------------------------
 
@@ -368,14 +372,14 @@ class GUI(QMainWindow):
         tmp = dialogs.AddChannelDialog(self)
         if tmp.exec_():
             self.CONNECTION.addChannel(tmp.name.text(), tmp.password.text())
-            print("Dodanie kanału ", tmp.name.text(), " z hasłem ", tmp.password.text())
+            #print("Dodanie kanału ", tmp.name.text(), " z hasłem ", tmp.password.text())
             self.refreshChannelsTree()
 
     def delChannel(self):
         channel, result = QInputDialog.getItem(self, "Delete channel", "Name", self.CONNECTION.CHANNELS_LIST, 0, False)
         if result:
             self.CONNECTION.delChannel(channel)
-            print("Usunięto ", channel)
+            #print("Usunięto ", channel)
             self.refreshChannelsTree()
 
     def blockNick(self):
