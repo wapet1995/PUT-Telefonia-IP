@@ -8,10 +8,10 @@ from queue import Queue, Empty
 import base64
 
 class Server:
-    def __init__(self):
+    def __init__(self, ip):
         # technical parameters
         self.SIZE_OF_BUFFER = 1024  # max size of packets sending through socket
-        self.SERVER_IP = '192.168.0.12'
+        self.SERVER_IP = ip
         self.SERVER_PORT = 50000
         self.SERVER_PORT_UDP = 60000
         self.MAX_USERS = 20
@@ -480,5 +480,9 @@ class Server:
 
 
 if __name__ == "__main__": 
-    s = Server() 
+    if len(sys.argv)<2:
+        print("Proszę uzupełnić adres IP, np.: server.py 192.168.0.12")
+        sys.exit()
+    ip = sys.argv[1]
+    s = Server(ip)
     s.run()
