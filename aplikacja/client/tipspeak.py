@@ -196,7 +196,7 @@ class GUI(QMainWindow):
             admin_password = str(conn.admin_password.text())
             self.CONNECTION = Client(nick, server_ip, server_port)
             if self.CONNECTION.connect(admin_password): # return True
-                print("Połączono")
+                #print("Połączono")
                 self.statusBar().showMessage('Connected')
                 self.conn_status.setText("Server IP: " + server_ip)
                 self.conn_status.setStyleSheet("color: green;")

@@ -180,6 +180,8 @@ class Client:
                 except socket.timeout as e:
                     #print("Odtwarzanie błąd 1:", e)
                     continue
+                except:
+                    return (in_data, pyaudio.paComplete)
             return (in_data, pyaudio.paContinue)
 
         CHUNK = 512
@@ -205,6 +207,7 @@ class Client:
         try:
             self.UDP_CONNECTION.bind((self.MY_IP_ADDRESS,tmp))
         except Exception as e:
+            pass
             #print("UDP init error:", str(e))
         self.UDP_MY_PORT = tmp
 
